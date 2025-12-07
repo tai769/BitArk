@@ -28,11 +28,12 @@ public class WalWriter_V1 implements AutoCloseable{
     private static final int QUEUE_SIZE = 10000;
     private static final int BUFFER_SIZE = 1024 * 64; // 64KB Write Buffer
     private static final long COMMIT_INTERVAL_MS = 10; // Group Commit 最大等待时间
+
     // 文件与通道
     private final FileChannel fileChannel;
     private final ByteBuffer writeBuffer;
 
-    // 异步队列 (Partition Thread -> WalWriter Thread)
+    // 异步队列
     private final BlockingQueue<LogEntry> queue;
 
     // 刷盘线程
@@ -55,7 +56,7 @@ public class WalWriter_V1 implements AutoCloseable{
         this.ioThread = new Thread(this::ioLoop, "wal-writer-thread");
         this.ioThread.start();
     }
-    public  void append(LogEntry entry) throws  InterruptedException{
+    public void append(LogEntry entry) throws  InterruptedException{
         if (!running.get()){
             throw new IllegalStateException("WalWriter is closed");
         }
@@ -84,7 +85,7 @@ public class WalWriter_V1 implements AutoCloseable{
                 batchBuffer.add(first);
                 queue.drainTo(batchBuffer, QUEUE_SIZE -1);
 
-                //3. 序列化到 DirectBuffer
+                //3. 序列化
                 for (LogEntry entry : batchBuffer){
                     // 检查 Buffer 是否有足够空间 (LogEntry定长21字节)
                     if (writeBuffer.remaining() < LogEntry.ENTRY_SIZE){
@@ -108,6 +109,7 @@ public class WalWriter_V1 implements AutoCloseable{
             }
         }
     }
+
     /**
      * 执行真正的IO操作
      */
