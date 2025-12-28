@@ -46,26 +46,19 @@ public class WalWriter_V2   implements AutoCloseable{
     private final ByteBuffer writeBuffer;
     private final Thread ioThread;
     private final AtomicBoolean running = new AtomicBoolean(true);
-
-    public WalWriter_V2(String filePath) throws IOException {
+    public WalWriter_V2(String filePath, long  initPosition) throws IOException {
         File file = new File(filePath);
-        if (!file.getParentFile().exists()) {
-            file.getParentFile().mkdirs();
+        File parentFile = file.getParentFile();
+        if (parentFile != null && !parentFile.exists()) {
+            parentFile.mkdirs();
         }
 
-        //1. 优化点1 ： 预分配文件空间
-        try ( RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
-            // 使用RandomAccessFile 设置文件大小，避免扩容
-
-            if (raf.length() < PRE_ALLOCATE_SIZE) {
-                raf.setLength(PRE_ALLOCATE_SIZE);
-                }
-            }
+            //不要预分配空间，把这个位置交给wal去读取 ,这里其实需要判断是否是预分配内存
             //获取channel
             this.fileChannel = new RandomAccessFile(file, "rw").getChannel();
             // 生产环境需读取 Checkpoint 恢复 position，这里简化为从头写或追加
-            this.fileChannel.position(0);
-
+       
+            this.fileChannel.position(initPosition);
             this.writeBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
             this.queue = new ArrayBlockingQueue<>(QUEUE_SIZE);
 
