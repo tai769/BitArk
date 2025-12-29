@@ -3,6 +3,8 @@ package wal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,6 +19,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+
+@Slf4j
 public class WalWriter_V2   implements AutoCloseable{
     private static final Logger logger =
             LoggerFactory.getLogger(WalWriter_V2.class);
@@ -30,6 +34,37 @@ public class WalWriter_V2   implements AutoCloseable{
 
     private static final long PRE_ALLOCATE_SIZE = 1024 * 1024 * 100; //预分配 100MB
 
+
+    //单例模式
+    private static WalWriter_V2 instance;
+
+    //初始化
+    public static WalWriter_V2 init(String filePath) throws IOException{
+        WalReader_V1 reader = new WalReader_V1();
+        long initPosition;
+        try {
+            initPosition = reader.replay(filePath, null);
+            return new WalWriter_V2(filePath, initPosition);
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            log.error("初始化失败")
+            return new WalWriter_V2(filePath, 0);
+            
+        }
+           
+     
+        
+    }
+
+    public static WalWriter_V2 getInstance() throws IOException {
+        if (instance == null) {
+            String filePath = "wal.log";
+            instance = init(filePath);
+        }
+        return instance;
+    }
+
+    @Data
     private static class WriteRequest{
         final LogEntry entry;
         final CompletableFuture<Boolean> futrue;
@@ -40,6 +75,9 @@ public class WalWriter_V2   implements AutoCloseable{
 
         }
     }
+
+
+
 
     private final BlockingQueue<WriteRequest> queue;
     private final FileChannel fileChannel;

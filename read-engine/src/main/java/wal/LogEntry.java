@@ -11,11 +11,12 @@ import java.util.zip.CRC32;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LogEntry {
-    private byte type;
+    private byte type; //判断是否读取
     private Long userId;
     private Long msgId;
 
     public static final int ENTRY_SIZE = 21;  //1 + 8 + 8 + 4(数据校验）
+    public static final byte READ_ENTRY = 1;
 
     public byte[] encode() {
         // 1. 申请一个 21 字节的缓冲区
