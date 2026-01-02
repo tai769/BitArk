@@ -68,6 +68,9 @@ public class LogEntry {
     }
     
     public static LogEntry decode(ByteBuffer buffer) {
+        if (buffer.remaining() < ENTRY_SIZE) {
+            throw new RuntimeException("Buffer too small to decode LogEntry");
+        }
         int startPos = buffer.position();
         byte type = buffer.get();
         long userId = buffer.getLong();
