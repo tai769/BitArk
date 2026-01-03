@@ -13,7 +13,7 @@ public class ReadStatusController {
 
     // 标记消息为已读
     @PostMapping("/mark")
-    public String markAsRead(@RequestParam Long userId, @RequestParam Long msgId) {
+    public String markAsRead(@RequestParam("userId") Long userId, @RequestParam("msgId") Long msgId) {
         try {
             readService.read(userId, msgId);
             return "Message marked as read successfully for user: " + userId + ", msg: " + msgId;
@@ -24,7 +24,7 @@ public class ReadStatusController {
 
     // 检查消息是否已读
     @GetMapping("/check")
-    public boolean isRead(@RequestParam Long userId, @RequestParam Long msgId) {
+    public boolean isRead(@RequestParam("userId") Long userId, @RequestParam("msgId") Long msgId) {
         return readService.isRead(userId, msgId);
     }
 

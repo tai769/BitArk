@@ -1,0 +1,14 @@
+server:
+  port: 8082  # 节点3端口
+
+spring:
+  application:
+    name: read-adapter-node3  # 应用名称
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    adapter: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

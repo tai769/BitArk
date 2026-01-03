@@ -1,4 +1,4 @@
-/*
+package cluster;/*
 * 实现分片策略
 */
 
@@ -38,6 +38,8 @@ public class ShardingStrategy {
 
     public NodeInfo route(Long userId){
         int shareIdIndex = getShareIdIndex(userId);
-        return shardMap.get(shareIdIndex);
+        // 确保索引在分片范围内
+        int shardIndex = shareIdIndex % shardCount;
+        return shardMap.get(shardIndex);
     }
 }
