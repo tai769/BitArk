@@ -1,7 +1,15 @@
 package service;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
 import engine.ReadStatusEngine;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.web.client.RestTemplate;
+import util.ThreadUtils;
 import wal.LogEntry;
 import wal.LogEntryHandler;
 import wal.WalReader_V1;
@@ -11,6 +19,13 @@ import wal.WalWriter_V2;
 public class ReadServiceImpl implements ReadService {
 
   ReadStatusEngine engine = new ReadStatusEngine();
+
+  private final RestTemplate restTemplate = new RestTemplate();
+
+  private ExecutorService executorService = ThreadUtils.newThreadPoolExecutor(32, 64, 1000L, TimeUnit.MILLISECONDS,
+      new LinkedBlockingQueue<>(),
+      "sync",
+      true);
 
   // 只负责 wal的操作
   @Override
@@ -24,6 +39,21 @@ public class ReadServiceImpl implements ReadService {
       /*
        * 发送同步请求
        */
+
+      executorService.submit(() -> {
+        // 1. 先获取路由
+        String slaveUrl = "http://127.0.0.1:8081/internal/sync?userId=" + userId + "&msgId=" + msgId;
+
+        // 2. 发送同步请求
+        try {
+          restTemplate.postForObject(slaveUrl, null, String.class);
+          log.info("sync success");
+        } catch (Exception e) {
+          log.error("sync error", e);
+        }
+
+      });
+
     } catch (Exception e) {
       walWriter.close();
       log.error("read error", e);
