@@ -1,5 +1,6 @@
 package service;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +78,16 @@ public class ReadServiceImpl implements ReadService {
   public boolean isRead(Long userId, Long msgId) {
 
     return engine.isRead(userId, msgId);
+  }
+
+  @Override
+  public void readFromMaster (Long userId, Long msgId) throws Exception {
+      log.info("readFromMaster");
+      WalWriter_V2 walWriter = WalWriter_V2.getInstance();
+
+      LogEntry entry = new LogEntry(LogEntry.READ_ENTRY, userId, msgId);
+      walWriter.append(entry);
+      engine.markRead(userId, msgId);
   }
 
 }

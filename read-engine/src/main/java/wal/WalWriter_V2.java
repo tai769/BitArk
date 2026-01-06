@@ -33,6 +33,8 @@ public class WalWriter_V2 implements AutoCloseable {
     // 单例模式
     private static WalWriter_V2 instance;
 
+    private Thread ioThread;
+
     // 初始化
     public static WalWriter_V2 init(String filePath) throws IOException {
         WalReader_V1 reader = new WalReader_V1();

@@ -27,18 +27,18 @@ public class ThreadFactoryImpl implements ThreadFactory {
     @Override
     public Thread newThread(Runnable r) {
 
-        Thread thread = new Thread(r, threadNamePrefix + this.threadIndex.incrementAndGet())
+        Thread thread = new Thread(r, threadNamePrefix + this.threadIndex.incrementAndGet());
         // TODO Auto-generated method stub
        
         
         thread.setUncaughtExceptionHandler((t,e) -> 
         log.error("[BUG] Thread has an uncaught exception, threadId={}, threadName={}",
-            t.getId,
-            t.getName,
+            t.getId(),
+            t.getName(),
             e
         )
-    );  
-        
+    );
+        return thread;
     }
 
 }

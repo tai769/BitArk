@@ -51,6 +51,17 @@ public class shareIdTest {
         result3 = client.isRead(3L, 6L);
         System.out.println("用户3的消息6已读状态: " + result3);
         
+        
+        // 测试路由一致性
+        Long userId = 12345L;
+
+        // 调用10次，验证路由结果是否一致
+        NodeInfo firstNode = strategy.route(userId);
+        for (int i = 0; i < 10; i++) {
+            NodeInfo node = strategy.route(userId);
+            assert node.getNodeId() == firstNode.getNodeId();
+        }
+        System.out.println("路由一致性测试通过");
 
     }
     
