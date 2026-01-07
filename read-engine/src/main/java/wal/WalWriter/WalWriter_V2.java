@@ -1,10 +1,13 @@
-package wal;
+package wal.walWriter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import wal.LogEntry;
+import wal.WalReader_V1;
+import wal.config.WalConfig;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +36,8 @@ public class WalWriter_V2 implements AutoCloseable {
     // 单例模式
     private static WalWriter_V2 instance;
 
+    
+
     private Thread ioThread;
 
     // 初始化
@@ -57,7 +62,8 @@ public class WalWriter_V2 implements AutoCloseable {
         if (instance == null) {
             synchronized (WalWriter_V2.class) {
                 if (instance == null) {
-                    instance = init("wal3.log");
+                    WalConfig config = new WalConfig();
+                    instance = init(config.getWalPath());
                 }
             }
         }
@@ -85,6 +91,7 @@ public class WalWriter_V2 implements AutoCloseable {
         this.queue = new ArrayBlockingQueue<>(QUEUE_SIZE);
 
         this.ioThread = new Thread(this::ioLoop, "wal-v2-writer");
+        this.ioThread.start();
     }
 
     @Override

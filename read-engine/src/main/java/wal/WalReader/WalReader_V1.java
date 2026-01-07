@@ -1,7 +1,8 @@
-package wal;
+package wal.WalReader;
 
 import lombok.extern.slf4j.Slf4j;
-
+import wal.LogEntry;
+import wal.LogEntryHandler;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
