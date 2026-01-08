@@ -1,116 +1,102 @@
-# Project Plan: High-Performance Distributed Read Service
+# Project Plan: Distributed In-Memory Read Service (Middleware Core)
 
-> **项目目标**：构建一个基于内存、持久化、高吞吐、低延迟的分布式“已读服务”引擎。  
-> **核心架构**：LSM-style WAL (Write-Ahead Log) + In-Memory Bitmap + AP Model Clustering (最终一致性)。
-
----
-
-## 📅 Phase 1: 单机核心引擎 (Current Focus)
-**目标**：实现一个 Crash-Safe（崩溃安全）的单机存储引擎。确保进程重启后，通过重放日志恢复内存状态。
-
-### 1.1 完善 WAL 写入 (Done/Refine)
-- [x] **`WalWriter_V2`**: 基于 NIO `FileChannel` + 堆外内存 + 组提交 (Group Commit) + 异步回调。
-- [ ] **Refactor**: 修改构造函数，支持传入 `initPosition`（初始写入偏移量），避免重启覆盖旧数据。
-
-### 1.2 实现 WAL 读取与恢复 (Priority High)
-- [ ] **`WalReader`**:
-    - **遍历逻辑**：从文件头开始读取，解析 `[Length][Body][CRC]` 格式。
-    - **校验逻辑**：校验 CRC32，确保数据未损坏。
-    - **截断逻辑 (Truncate)**：遇到文件尾部的半条残损日志（因断电导致），自动截断并忽略，返回有效的 `EndOffset`。
-    - **接口定义**：`long replay(String path, LogEntryHandler handler)`。
-
-### 1.3 内存状态机 (State Machine)
-- [ ] **`ReadStatusEngine`**:
-    - **数据结构**：引入 **RoaringBitmap** (推荐) 或使用 JDK `BitSet`。
-    - **存储模型**：`ConcurrentHashMap<Long /*UserId*/, RoaringBitmap /*MessageIds*/>`。
-    - **业务逻辑**：
-        - `apply(LogEntry entry)`: 幂等更新内存。
-        - `isRead(long userId, long messageId)`: 内存查询。
-
-### 1.4 引擎组装与启动流程
-- [ ] **`ReadServiceServer`** (Bootstrap):
-    1. 初始化内存引擎 `new ReadStatusEngine()` (此时为空)。
-    2. 初始化 `WalReader` -> 调用 `replay()` 回放历史数据填入引擎。
-    3. 获取回放结束的 `lastValidOffset`。
-    4. 初始化 `WalWriter(lastValidOffset)` -> 准备接收新写入。
-    5. **验证测试**：编写 Integration Test，模拟写入 -> 杀进程 -> 重启 -> 查询数据是否存在。
+> **项目定位**：从零构建一个**分布式、高性能、强可靠**的“已读服务”中间件。
+> **核心架构**：
+> 1. **存储层**：RoaringBitmap (内存) + WAL (持久化) + Snapshot (快照)。
+> 2. **集群层**：自研 NameServer (元数据管理) + Smart Client (客户端分片)。
+> 3. **通信层**：基于 gRPC/Netty 的长连接通信。
 
 ---
 
-## 🚀 Phase 2: 网络化与 RPC 接口
-**目标**：将单机引擎封装为网络服务，支持远程调用，为集群化做准备。
+## 📅 Phase 1: 核心存储引擎 (The Storage Kernel)
+**目标**：构建一个单机版、掉电不丢数据、读写性能极致的存储黑盒。
 
-### 2.1 定义通信协议
-- [ ] **Protocol**: 使用 **Protobuf** 定义请求/响应包（更紧凑，适合高性能场景）。
-    - `MarkReadRequest { int64 user_id; int64 message_id; }`
-    - `QueryReadRequest { int64 user_id; int64 message_id; }`
+### 1.1 WAL 日志子系统 (Persistence)
+- [x] **写入器 (`WalWriter`)**: 
+  - 基于 NIO `FileChannel`，堆外内存缓冲，支持 Group Commit。
+  - **多文件滚动 (Log Rolling)**: 单文件固定大小 (e.g. 1GB)，写满自动滚动，便于过期清理。
+- [ ] **恢复器 (`WalReader`)**:
+  - 启动时重放日志，校验 CRC32，自动截断 (Truncate) 末尾脏数据，精准定位写入位点。
+- [ ] **检查点 (`Checkpoint`)**:
+  - 定时将内存全量数据 Dump 为快照文件。
+  - 快照完成后，异步删除旧的 WAL 文件，防止磁盘爆炸。
 
-### 2.2 网络层实现
-- [ ] **Server**: 引入 **Netty**。
-    - 建立 TCP Server。
-    - 编写 `Codec` 处理粘包/拆包。
-    - `Handler` 层调用 Phase 1 的 Engine 处理业务。
-- [ ] **Client SDK**: 封装 Java Client，提供 `markRead()` 和 `isRead()` 阻塞/异步方法。
+### 1.2 内存状态机 (In-Memory Engine)
+- [ ] **数据结构优化**:
+  - 核心存储：`ConcurrentHashMap<Long /*UserId*/, RoaringBitmap>`。
+  - 采用 **RoaringBitmap** 替代 JDK BitSet，解决稀疏数据内存占用过大问题。
+- [ ] **并发控制**:
+  - 读写分离设计，确保高并发下 `markRead` (写) 不阻塞 `isRead` (读)。
 
----
-
-## 🌐 Phase 3: 弱一致性集群 (Distributed AP Model)
-**目标**：支持水平扩展（Sharding）和高可用（Replication），采用无主或异步主从复制，允许短暂的数据不一致。
-
-### 3.1 数据分片 (Sharding)
-- [ ] **路由策略**：
-    - 实现简单的客户端路由或 Proxy 层。
-    - 算法：`Hash(UserId) % NodeCount` 或一致性哈希。
-    - **效果**：不同的用户数据分布在不同的机器上，突破单机内存瓶颈。
-
-### 3.2 异步复制 (Replication)
-- [ ] **Master-Slave / Peer-to-Peer 架构**：
-    - 每个分片配置 1 Master + N Slaves。
-    - **写流程**：Client -> Master 写 WAL + 内存 -> **立刻返回 OK** (保证极低延迟)。
-    - **同步流程**：Master 后台线程持续将新增的 WAL Log 推送给 Slave。
-    - **Slave 流程**：收到 Log -> 写本地 WAL -> 更新本地内存。
-
-### 3.3 故障转移 (Failover) - *MVP版*
-- [ ] **切换机制**：
-    - 当 Master 宕机，客户端或者协调组件感知。
-    - 能够降级读取 Slave，或者将 Slave 提升为新 Master（注意处理数据丢失问题）。
+### 1.3 服务端通信层 (Remoting Server)
+- [ ] **RPC 接口定义**:
+  - 使用 **Protobuf** 定义紧凑的二进制协议。
+  - `rpc MarkRead(MarkReq)`: 极速写入。
+  - `rpc IsRead(QueryReq)`: 内存直读。
+- [ ] **Server 实现**:
+  - 启动 **gRPC Server** (Netty Backend)。
+  - 维护 TCP 长连接，避免 HTTP 短连接的握手开销。
 
 ---
 
-## 🛠 Phase 4: 工程化与生产级特性 (Engineering Polish)
-**目标**：优化性能，增加可维护性，防止随着时间推移数据量爆炸。
+## 🧠 Phase 2: 自研集群元数据 (The Metadata/NameServer)
+**目标**：不依赖 Zookeeper/Etcd，实现轻量级的服务注册与发现 (类似 RocketMQ NameServer)。
 
-### 4.1 快照机制 (Snapshotting)
-- [ ] **Snapshot Writer**:
-    - 后台定时任务（如每 10 分钟）。
-    - 将内存中的 `Map<UserId, RoaringBitmap>` 序列化存储到 `snapshot.bin`。
-- [ ] **Log Truncation**:
-    - 快照生成成功后，安全删除对应位点之前的旧 WAL 文件。
-- [ ] **Fast Recovery**:
-    - 重启逻辑优化：先加载 `snapshot.bin`，再回放少量的增量 WAL。
-
-### 4.2 监控与指标 (Observability)
-- [ ] **Metrics**:
-    - 集成 Prometheus / Micrometer。
-    - 关键指标：`write_latency`, `wal_size`, `qps`, `memory_usage`, `replication_lag`。
-- [ ] **Health Check**: 提供 `/health` 接口。
+### 2.1 NameServer 实现
+- [ ] **轻量级注册中心**:
+  - 一个独立的 Java 进程，无状态，可集群部署。
+  - 维护全局路由表：`Topic/Table -> Map<ShardId, List<NodeAddr>>`。
+- [ ] **RPC 接口**:
+  - `RegisterBroker`: Broker 启动/心跳时上报自身 IP、Port、负责的 ShardId。
+  - `GetRoute`: Client 拉取路由信息。
+- [ ] **存活检测**:
+  - 扫描路由表，剔除超过 30s 未发送心跳的 Broker。
 
 ---
 
-## 📚 技术栈建议 (Tech Stack)
+## 🌐 Phase 3: 客户端与路由 (Smart Client & Routing)
+**目标**：将路由逻辑下沉到客户端 SDK，实现无中心化的高性能访问。
 
-- **Language**: Java 17+ / 21
-- **Core IO**: `java.nio.channels.FileChannel` (读写分离，读可考虑 mmap)
-- **Memory Structure**: `org.roaringbitmap:RoaringBitmap` (高效压缩位图)
-- **Networking**: `Netty` 4.x
-- **Serialization**: `Protobuf` (推荐) 或 `Hessian`
-- **Logging**: `Slf4j` + `Logback`
-- **Testing**: `JUnit 5` + `JMH` (基准测试)
+### 3.1 客户端 SDK (Java)
+- [ ] **路由缓存与更新**:
+  - SDK 启动时连接 NameServer，拉取全量路由表并缓存到本地。
+  - 开启定时任务 (e.g. 30s) 刷新路由。
+- [ ] **本地分片路由**:
+  - 实现 Hash 算法：`targetNode = RouteTable.get( Hash(userId) % TotalShards )`。
+  - **No-Hop 直连**: 客户端直接与目标 Broker 建立 gRPC 连接，不经过任何网关转发。
 
 ---
 
-## 📝 开发原则 (Principles)
+## 🛡️ Phase 4: 高可用主备架构 (HA & Replication)
+**目标**：通过异步数据复制，实现节点级容灾。
 
-1. **Crash Safe First**: 所有的优化前提是不丢数据（除非显式配置为异步落盘）。
-2. **Memory Efficiency**: 这是一个内存密集型应用，关注对象分配，减少 GC 压力。
-3. **Keep It Simple**: 在 Phase 3 之前，不要引入 Zookeeper/Etcd 等外部依赖，先用静态配置跑通逻辑。
+### 4.1 主备数据同步
+- [ ] **架构模式**: `Master-Slave` 异步复制。
+- [ ] **同步流程**:
+  - Master 处理完写请求，返回 Client 成功。
+  - Master 后台线程批量读取 WAL，通过 gRPC 推送给 Slave。
+  - Slave 接收 LogEntry -> 写本地 WAL -> 重放进本地内存。
+
+### 4.2 故障处理 (Failover)
+- [ ] **客户端降级**:
+  - SDK 检测到 Master 连接断开/超时。
+  - 自动切换读取同分片下的 Slave 节点 (保证可读)。
+- [ ] **主备切换 (进阶)**:
+  - 配合 NameServer 实现自动选主 (Slave 晋升为 Master)。
+
+---
+
+## 📚 核心技术栈 (Hardcore Stack)
+
+- **Language**: Java 17+
+- **Transport**: **gRPC (Based on Netty)** - 高性能长连接 RPC。
+- **Storage**: **FileChannel (Direct I/O)** + **RoaringBitmap** - 核心存储壁垒。
+- **Serialization**: **Protobuf** - 极致序列化性能。
+- **Architecture**: **Share-Nothing** + **Smart Client** - 典型中间件架构。
+
+---
+
+## 📝 研发纪律
+1. **Crash Safe**: 任何时刻 `kill -9`，重启后数据必须能通过 WAL + Snapshot 100% 恢复。
+2. **Zero Waste**: 内存是瓶颈，严格控制对象创建，尽量复用 Buffer。
+3. **No Magic**: 不引入 Spring/Tomcat 等重型框架，main 函数直接启动，保持轻量。
