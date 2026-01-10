@@ -1,5 +1,6 @@
 package com.bitark.wal.WalReader;
 
+import com.bitark.engine.WalEngine;
 import lombok.extern.slf4j.Slf4j;
 import com.bitark.log.LogEntry;
 import com.bitark.log.LogEntryHandler;
@@ -10,7 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 @Slf4j
-public class WalReader_V1 {
+public class WalReader_V1 implements AutoCloseable{
 
     public long replay(String path, LogEntryHandler handler) throws  Exception{
         try(RandomAccessFile raf = new RandomAccessFile(path,"rw");
@@ -59,5 +60,11 @@ public class WalReader_V1 {
             totalRead += n;
         }
         return totalRead;
+    }
+
+    @Override
+    public void close() throws Exception {
+        // WalReader_V1 使用 try-with-resources 自动管理资源
+        // 所以不需要额外的清理操作
     }
 }

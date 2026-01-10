@@ -11,4 +11,6 @@ public interface WalEngine {
 
     Long replay(LogEntryHandler handler) throws Exception;
 
+    void close() throws Exception;
+
 }

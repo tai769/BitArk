@@ -3,16 +3,14 @@ package com.bitark.service;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-
 import com.bitark.engine.ReadStatusEngine;
+import com.bitark.engine.WalEngine;
+import com.bitark.engine.WalEngines;
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.web.client.RestTemplate;
 import com.bitark.thread.ThreadUtils;
 import com.bitark.log.LogEntry;
-import com.bitark.log.LogEntryHandler;
-import com.bitark.wal.WalReader.WalReader_V1;
-import com.bitark.wal.WalWriter.WalWriter_V2;
+import com.bitark.wal.config.WalConfig;
 
 
 @Slf4j
@@ -27,13 +25,25 @@ public class ReadServiceImpl implements ReadService {
       "sync",
       true);
 
+  private final WalEngine walEngine;
+
+  public ReadServiceImpl() throws Exception {
+    WalConfig config = new WalConfig(); //现在先默认配置
+    try{
+      this.walEngine = WalEngines.createEngine(config);
+
+    }catch(Exception e){
+      throw new RuntimeException("init WalEngine failed", e);
+    }
+    
+  }
+
   // 只负责 wal的操作
   @Override
   public void read(Long userId, Long msgId) throws Exception {
-    WalWriter_V2 walWriter = WalWriter_V2.getInstance();
     try {
       LogEntry entry = new LogEntry(LogEntry.READ_ENTRY, userId, msgId);
-      walWriter.append(entry);
+      walEngine.append(entry);
       engine.markRead(userId, msgId);
 
       /*
@@ -55,7 +65,7 @@ public class ReadServiceImpl implements ReadService {
       });
 
     } catch (Exception e) {
-      walWriter.close();
+      walEngine.close();
       log.error("read error", e);
     }
   }
@@ -63,13 +73,8 @@ public class ReadServiceImpl implements ReadService {
   @Override
   public void recover() throws Exception {
     // 1. 阅读以前的数据 然后恢复内存数据
-    WalReader_V1 walReader_V1 = new WalReader_V1();
-    walReader_V1.replay("wal.log", new LogEntryHandler() {
-
-      @Override
-      public void handle(LogEntry entry) {
-        engine.markRead(entry.getUserId(), entry.getMsgId());
-      }
+    walEngine.replay(entry -> {
+      engine.markRead(entry.getUserId(), entry.getMsgId());
     });
   }
 
@@ -82,10 +87,8 @@ public class ReadServiceImpl implements ReadService {
   @Override
   public void readFromMaster (Long userId, Long msgId) throws Exception {
       log.info("readFromMaster");
-      WalWriter_V2 walWriter = WalWriter_V2.getInstance();
-
       LogEntry entry = new LogEntry(LogEntry.READ_ENTRY, userId, msgId);
-      walWriter.append(entry);
+      walEngine.append(entry);
       engine.markRead(userId, msgId);
   }
 

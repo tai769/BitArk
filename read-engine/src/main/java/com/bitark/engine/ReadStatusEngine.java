@@ -3,8 +3,12 @@ package com.bitark.engine;
 
 
 
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.bitark.engine.userset.RoaringUserReadSet;
+import com.bitark.engine.userset.SetBasedUserReadSet;
+import com.bitark.engine.userset.UserReadSet;
+import com.bitark.enums.UserReadSetMode;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -14,7 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ReadStatusEngine {
 
-    private ConcurrentHashMap<Long, Set<Long>> readStatus;
+    private ConcurrentHashMap<Long, UserReadSet> readStatus;
+
+     private static final UserReadSetMode MODE = UserReadSetMode.ROARING;
    
 
     public ReadStatusEngine() {
@@ -26,14 +32,28 @@ public class ReadStatusEngine {
 
 
     public void markRead(Long userId, Long msgId) {
-        readStatus.computeIfAbsent(userId, k ->  ConcurrentHashMap.newKeySet()).add(msgId);  
+        readStatus.computeIfAbsent(userId, k -> newUserReadSet()).mark(msgId);  
     }
 
 
 
 
     public boolean isRead(Long userId, Long msgId) {
-        return readStatus.getOrDefault(userId, ConcurrentHashMap.newKeySet()).contains(msgId);
+        UserReadSet userReadSet = readStatus.get(userId);
+        return userReadSet != null && userReadSet.isRead(msgId);
+    }
+
+
+    private UserReadSet newUserReadSet() {
+        switch (MODE) {
+            case SET:
+                return new SetBasedUserReadSet();
+            case ROARING:
+                return new RoaringUserReadSet();
+            default:
+                throw new IllegalArgumentException("Unknown UserReadSetMode: " + MODE);
+        }
+
     }
         
          

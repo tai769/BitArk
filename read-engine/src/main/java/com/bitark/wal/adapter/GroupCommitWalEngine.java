@@ -17,8 +17,8 @@ public class GroupCommitWalEngine  implements WalEngine{
     private final WalReader_V1 reader;
     private final WalConfig config;
 
-    public GroupCommitWalEngine() throws IOException {
-        this.config = new WalConfig();
+    public GroupCommitWalEngine(WalConfig config) throws IOException {
+        this.config = config;
         this.writer = WalWriter_V2.init(config.getWalPath());
         this.reader = new WalReader_V1();
     }
@@ -31,6 +31,11 @@ public class GroupCommitWalEngine  implements WalEngine{
     @Override
     public Long replay(LogEntryHandler handler) throws Exception {
         return reader.replay(config.getWalPath(), handler);
+    }
+
+    @Override
+    public void close() throws Exception {
+        writer.close();
     }
 
 }

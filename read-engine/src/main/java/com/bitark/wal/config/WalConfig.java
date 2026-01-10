@@ -8,7 +8,7 @@ import lombok.Data;
 public class WalConfig {
 
     // 日志目录
-    private final String walDir = "/dtat/wal";
+    private final String walDir = "/home/qiushui/IdeaProjects/BitArk/";
 
     private final String walFileName = "wal.log";
 

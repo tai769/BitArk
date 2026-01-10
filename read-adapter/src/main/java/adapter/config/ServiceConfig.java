@@ -8,7 +8,7 @@ import com.bitark.service.ReadServiceImpl;
 public class ServiceConfig {
 
     @Bean
-    public ReadServiceImpl readService() {
+    public ReadServiceImpl readService() throws Exception {
         return new ReadServiceImpl();
     }
 }

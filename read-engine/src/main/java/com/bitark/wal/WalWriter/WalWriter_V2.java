@@ -96,10 +96,7 @@ public class WalWriter_V2 implements AutoCloseable , WalEngine {
         this.ioThread.start();
     }
 
-    @Override
-    public void close() throws Exception {
 
-    }
 
     @Data
     private static class WriteRequest {
@@ -195,4 +192,17 @@ public class WalWriter_V2 implements AutoCloseable , WalEngine {
         throw new UnsupportedOperationException("Unimplemented method 'replay'");
     }
 
+    @Override
+    public void close() throws Exception {
+        if (running.compareAndSet(true, false)) {
+            if (ioThread != null) {
+                ioThread.interrupt();
+                ioThread.join();
+            }
+            if (fileChannel != null) {
+                flush();
+                fileChannel.close();
+            }
+        }
+    }
 }
