@@ -44,7 +44,6 @@ public class WalWriter_V2 implements AutoCloseable {
     private final BlockingQueue<WriteRequest> queue;
     private final ByteBuffer writeBuffer;
     private final AtomicBoolean running = new AtomicBoolean(true);
-
     // 单例模式
     private static WalWriter_V2 instance;
 
