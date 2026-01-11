@@ -1,6 +1,5 @@
 package com.bitark.wal.WalReader;
 
-import com.bitark.engine.WalEngine;
 import lombok.extern.slf4j.Slf4j;
 import com.bitark.log.LogEntry;
 import com.bitark.log.LogEntryHandler;

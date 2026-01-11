@@ -2,6 +2,7 @@ package com.bitark.engine;
 
 import com.bitark.log.LogEntry;
 import com.bitark.log.LogEntryHandler;
+import com.bitark.wal.config.WalConfig;
 
 import java.util.concurrent.CompletableFuture;
 

@@ -5,12 +5,12 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.WalEngine;
-import com.bitark.engine.WalEngines;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 import com.bitark.thread.ThreadUtils;
 import com.bitark.log.LogEntry;
-import com.bitark.wal.config.WalConfig;
+
+
 
 
 @Slf4j
@@ -27,14 +27,8 @@ public class ReadServiceImpl implements ReadService {
 
   private final WalEngine walEngine;
 
-  public ReadServiceImpl() throws Exception {
-    WalConfig config = new WalConfig(); //现在先默认配置
-    try{
-      this.walEngine = WalEngines.createEngine(config);
-
-    }catch(Exception e){
-      throw new RuntimeException("init WalEngine failed", e);
-    }
+  public ReadServiceImpl(WalEngine walEngine) throws Exception {
+    this.walEngine = walEngine;
     
   }
 

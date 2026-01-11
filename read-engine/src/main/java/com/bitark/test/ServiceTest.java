@@ -8,7 +8,7 @@ public class ServiceTest {
 
     public static void main(String[] args) throws Exception {
         System.out.println("=== 开始测试 ReadService ===");
-        ReadServiceImpl readService = new ReadServiceImpl();
+      //  ReadServiceImpl readService = new ReadServiceImpl();
 
        /* try{
 
@@ -32,11 +32,11 @@ public class ServiceTest {
 
         try {
             System.out.println("=== 恢复数据 ===");
-            readService.recover();
+         //   readService.recover();
             System.out.println("=== 恢复完成 ===");
             System.out.println("\n1. 检查是否已读");
-            boolean isRead = readService.isRead(1L, 1L);
-            System.out.println("   结果: " + (isRead ? "已读" : "未读"));
+        //    boolean isRead = readService.isRead(1L, 1L);
+        //    System.out.println("   结果: " + (isRead ? "已读" : "未读"));
         }catch (Exception e){
             System.err.println("\n!!! 恢复失败 !!!");
         }

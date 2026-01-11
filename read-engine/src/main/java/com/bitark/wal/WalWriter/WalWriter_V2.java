@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
-public class WalWriter_V2 implements AutoCloseable , WalEngine {
+public class WalWriter_V2 implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(WalWriter_V2.class);
 
     // 配置
@@ -35,85 +35,132 @@ public class WalWriter_V2 implements AutoCloseable , WalEngine {
 
     private static final long MAX_WAIT_MS = 5; // group commit 策略调整
 
+
+    private final String baseDir;
+    private final String baseFileName;
+    private final long maxFileSizeBytes; 
+    private int currentIndex; // 当前文件索引
+    private FileChannel fileChannel;
+    private final BlockingQueue<WriteRequest> queue;
+    private final ByteBuffer writeBuffer;
+    private final AtomicBoolean running = new AtomicBoolean(true);
+
     // 单例模式
     private static WalWriter_V2 instance;
 
-    
+
 
     private Thread ioThread;
 
     // 初始化
-    public static WalWriter_V2 init(String filePath) throws IOException {
+    public static WalWriter_V2 init(WalConfig config) throws IOException {
+        
+        String baseDir = config.getWalDir();
+        String baseFileName = config.getWalFileName();
+        Long maxFileSizeBytes = config.getMaxFileSizeBytes();
+
+        //决定从那个index开始
+        int startIndex = findMaxIndexFromDir(baseDir, baseFileName); // 简单实现: 无文件则返回
+
+        // 计算当前要replay的文件路径(只针对最后一个文件回放,后续在完善)
+        String path = buildFilePath(baseDir, baseFileName, startIndex);
+
         WalReader_V1 reader = new WalReader_V1();
         long initPosition;
         try {
-            initPosition = reader.replay(filePath, (LogEntry entry) -> {
+            initPosition = reader.replay(path, (LogEntry entry) -> {
+                //暂时只是打印,真正的恢复在WalEngine.replay做
                 log.info("Replay entry: {}", entry);
             });
-            return new WalWriter_V2(filePath, initPosition);
-
+           
         } catch (Exception e) {
             // TODO Auto-generated catch block
             log.error("初始化失败");
-            return new WalWriter_V2(filePath, 0);
+            initPosition = 0L;
         }
+        return new WalWriter_V2(baseDir, baseFileName, maxFileSizeBytes, startIndex, initPosition);
 
     }
 
-    public static WalWriter_V2 getInstance() throws IOException {
+    private static int findMaxIndexFromDir(String dir, String baseFileName) {
+        File folder = new File(dir);
+        if (!folder.exists()) {
+            return 0;
+        }
+        File[] files = folder.listFiles();
+        if (files == null || files.length == 0) {
+            return 0;
+        }
+        int maxIndex = 0;
+        for (File file : files) {
+            String name = file.getName();
+            if (!name.startsWith(baseFileName + ".")) {
+                continue;
+            }
+            //解析后缀的数字部分
+            String suffixe = name.substring((baseFileName + ".").length());
+            try{
+                int idx = Integer.parseInt(suffixe);
+                if (idx > maxIndex) {
+                    maxIndex = idx;
+                }
+            } catch (NumberFormatException e) {
+                //非数字后缀,忽略
+            }
+        }
+        return maxIndex; 
+        
+    }
+
+    private static String buildFilePath(String dir, String fileName, int index) {
+        return dir + File.separator + fileName + "." + index;
+    }
+
+    public static WalWriter_V2 getInstance(WalConfig config) throws IOException {
         if (instance == null) {
             synchronized (WalWriter_V2.class) {
                 if (instance == null) {
-                    WalConfig config = new WalConfig();
-                    instance = init(config.getWalPath());
+                    instance = init(config);
                 }
             }
         }
         return instance;
     }
 
-    private final BlockingQueue<WriteRequest> queue;
-    private final FileChannel fileChannel;
-    private final ByteBuffer writeBuffer;
-    private final AtomicBoolean running = new AtomicBoolean(true);
 
-    public WalWriter_V2(String filePath, long initPosition) throws IOException {
-        File file = new File(filePath);
-        File parentFile = file.getParentFile();
-        if (parentFile != null && !parentFile.exists()) {
-            parentFile.mkdirs();
-        }
-        // 不要预分配空间，把这个位置交给wal去读取 ,这里其实需要判断是否是预分配内存
-        // 获取channel
-        this.fileChannel = new RandomAccessFile(file, "rw").getChannel();
-        // 生产环境需读取 Checkpoint 恢复 position，这里简化为从头写或追加
-
+    public WalWriter_V2(String baseDir, String baseFileName, Long maxFileSizeBytes, int startIndex, long initPosition) throws IOException {
+        this.baseDir = baseDir;
+        this.baseFileName = baseFileName;
+        this.maxFileSizeBytes = maxFileSizeBytes;
+        this.currentIndex = startIndex;
+        
+        this.fileChannel = openChannelForIndex(currentIndex);
         this.fileChannel.position(initPosition);
         this.writeBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
         this.queue = new ArrayBlockingQueue<>(QUEUE_SIZE);
 
         this.ioThread = new Thread(this::ioLoop, "wal-v2-writer");
-        this.ioThread.start();
+        this.ioThread.start();    
+    }
+
+
+    // 打开指定 index 的文件（不存在则创建），并返回 FileChannel
+    private FileChannel openChannelForIndex(int index) throws IOException {
+        String path = buildFilePath(baseDir, baseFileName, index);
+       File file = new File(path);
+       File parent = file.getParentFile();
+       if (parent != null && !parent.exists()) {
+           parent.mkdirs();
+       }
+       return new RandomAccessFile(file, "rw").getChannel();
     }
 
 
 
-    @Data
-    private static class WriteRequest {
-        final LogEntry entry;
-        final CompletableFuture<Boolean> futrue;
-
-        WriteRequest(LogEntry entry) {
-            this.entry = entry;
-            this.futrue = new CompletableFuture<>();
-
-        }
-    }
 
     /*
      * 优化点2 ： 返回Future, 支持强一致性等待
      */
-    @Override
     public CompletableFuture<Boolean> append(LogEntry entry) {
         if (!running.get()) {
             throw new IllegalStateException("WalWriter is closed");
@@ -184,13 +231,25 @@ public class WalWriter_V2 implements AutoCloseable , WalEngine {
         // 传 false可以减少一次更新 Inode的IO操作
         fileChannel.force(false);
         writeBuffer.clear();
+
+        maybeRoll();
     }
 
-    @Override
-    public Long replay(LogEntryHandler handler) throws Exception {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'replay'");
+
+
+    public void maybeRoll() throws IOException {
+        Long size  = fileChannel.position(); // 文件写到哪里了
+        if (size >= maxFileSizeBytes) {
+            //1. 关闭当前文件
+            fileChannel.close();
+            currentIndex++;
+            fileChannel = openChannelForIndex(currentIndex);
+            fileChannel.position(0L);
+            log.info("Rolled to new file: {}", baseDir+File.separator+baseFileName);
+        }
     }
+
+
 
     @Override
     public void close() throws Exception {
@@ -203,6 +262,20 @@ public class WalWriter_V2 implements AutoCloseable , WalEngine {
                 flush();
                 fileChannel.close();
             }
+        }
+    }
+
+
+
+    @Data
+    private static class WriteRequest {
+        final LogEntry entry;
+        final CompletableFuture<Boolean> futrue;
+
+        WriteRequest(LogEntry entry) {
+            this.entry = entry;
+            this.futrue = new CompletableFuture<>();
+
         }
     }
 }

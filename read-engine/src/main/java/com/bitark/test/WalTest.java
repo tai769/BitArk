@@ -10,6 +10,7 @@ import com.bitark.wal.WalWriter.WalWriter_V2;
 
 public class WalTest {
 
+/*
     public static void main(String[] args) {
         // 测试wal reader 和wal writer
         WalWriter_V2 walWriter;
@@ -67,5 +68,6 @@ public class WalTest {
         }
 
     }
+*/
 
 }

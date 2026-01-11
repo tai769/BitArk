@@ -20,12 +20,18 @@ public class ReadStatusEngine {
 
     private ConcurrentHashMap<Long, UserReadSet> readStatus;
 
-     private static final UserReadSetMode MODE = UserReadSetMode.ROARING;
+     private final UserReadSetMode mode;
    
 
     public ReadStatusEngine() {
+        this.mode = UserReadSetMode.ROARING;
         this.readStatus = new ConcurrentHashMap<>();
         ;
+    }
+    
+    public ReadStatusEngine(UserReadSetMode mode) {
+        this.mode = mode;
+        this.readStatus = new ConcurrentHashMap<>();
     }
 
  
@@ -45,13 +51,13 @@ public class ReadStatusEngine {
 
 
     private UserReadSet newUserReadSet() {
-        switch (MODE) {
+        switch (mode) {
             case SET:
                 return new SetBasedUserReadSet();
             case ROARING:
                 return new RoaringUserReadSet();
             default:
-                throw new IllegalArgumentException("Unknown UserReadSetMode: " + MODE);
+                throw new IllegalArgumentException("Unknown UserReadSetMode: " + mode);
         }
 
     }

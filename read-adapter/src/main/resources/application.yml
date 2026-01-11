@@ -11,6 +11,13 @@ servlet:
     max-file-size: 10MB
     max-request-size: 10MB
 
+
+wal:
+  dir: /home/qiushui/IdeaProjects/BitArk/wal
+  file-name: wal.log
+  mode: group_commit
+  max-file-size-bytes: 4096
+
 # 日志配置
 logging:
   level:
