@@ -3,6 +3,9 @@ package com.bitark.engine;
 
 
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.bitark.engine.userset.RoaringUserReadSet;
@@ -62,7 +65,36 @@ public class ReadStatusEngine {
 
     }
         
-         
+    
+
+    public void saveSnapshot(DataOutputStream out){
+        try{
+            out.writeInt(readStatus.size());
+            for(Map.Entry<Long, UserReadSet> entry : readStatus.entrySet()){
+                out.writeLong(entry.getKey());
+                entry.getValue().toSnapshot(out);
+            }
+            
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public void loadSnapshot(DataInputStream in){
+        try{
+            readStatus.clear();
+            int size = in.readInt();
+            for(int i = 0; i < size; i++){
+                Long userId = in.readLong();
+                UserReadSet userReadSet = newUserReadSet();
+                userReadSet.loadSnapshot(in);
+                readStatus.put(userId, userReadSet);
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+
 
 
 
