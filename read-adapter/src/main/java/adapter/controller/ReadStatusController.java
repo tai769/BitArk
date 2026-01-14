@@ -38,4 +38,14 @@ public class ReadStatusController {
             return "Error during recovery: " + e.getMessage();
         }
     }
+
+    @PostMapping("/snapshot")
+    public String snapshot() {
+        try {
+            readService.snapshot();
+            return "Snapshot 已保存";
+        } catch (Exception e) {
+            return "Snapshot 失败: " + e.getMessage();
+        }
+    }
 }

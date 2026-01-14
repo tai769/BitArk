@@ -1,5 +1,8 @@
 package com.bitark.service;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -8,6 +11,7 @@ import com.bitark.engine.WalEngine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 import com.bitark.thread.ThreadUtils;
+import com.bitark.util.SnapshotManager;
 import com.bitark.log.LogEntry;
 
 
@@ -15,6 +19,8 @@ import com.bitark.log.LogEntry;
 
 @Slf4j
 public class ReadServiceImpl implements ReadService {
+
+  private static final String SNAPSHOT_PATH = "/home/qiushui/IdeaProjects/BitArk/snapshot.bin";
 
   ReadStatusEngine engine = new ReadStatusEngine();
 
@@ -26,10 +32,11 @@ public class ReadServiceImpl implements ReadService {
       true);
 
   private final WalEngine walEngine;
+  private final SnapshotManager snapshotManager;
 
   public ReadServiceImpl(WalEngine walEngine) throws Exception {
     this.walEngine = walEngine;
-    
+    this.snapshotManager = new SnapshotManager(Paths.get(SNAPSHOT_PATH));
   }
 
   // 只负责 wal的操作
@@ -66,10 +73,29 @@ public class ReadServiceImpl implements ReadService {
 
   @Override
   public void recover() throws Exception {
-    // 1. 阅读以前的数据 然后恢复内存数据
+    log.info("开始恢复内存状态...");
+    Path snapshotPath = Paths.get(SNAPSHOT_PATH);
+    
+    try {
+      // 1. 尝试从 snapshot 恢复
+      if (Files.exists(snapshotPath)) {
+        log.info("发现 snapshot 文件: {}", snapshotPath);
+        snapshotManager.load(engine);
+        log.info("✅ Snapshot 恢复成功");
+      } else {
+        log.warn("⚠️  Snapshot 文件不存在，将全量从 WAL 恢复");
+      }
+    } catch (Exception e) {
+      log.error("❌ Snapshot 读取失败: {}，将全量从 WAL 恢复", e.getMessage());
+    }
+   
+    // 2. 从 WAL 回放（现在还是全量 replay，后续加 checkpoint 后会改成增量）
+    log.info("开始从 WAL 回放...");
     walEngine.replay(entry -> {
       engine.markRead(entry.getUserId(), entry.getMsgId());
     });
+    log.info("✅ WAL 回放完成");
+    log.info("✅ 内存状态恢复完成");
   }
 
   @Override
@@ -85,5 +111,16 @@ public class ReadServiceImpl implements ReadService {
       walEngine.append(entry);
       engine.markRead(userId, msgId);
   }
+
+  @Override
+  public void snapshot() throws Exception {
+    log.info("开始保存 snapshot...");
+    snapshotManager.save(engine);
+    log.info("✅ Snapshot 已保存到: {}", SNAPSHOT_PATH);
+  }
+
+
+
+
 
 }

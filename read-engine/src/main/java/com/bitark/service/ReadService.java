@@ -10,4 +10,9 @@ public interface ReadService {
     boolean isRead(Long userId, Long msgId);
 
     void readFromMaster (Long userId, Long msgId)throws Exception;
+
+
+    void snapshot() throws Exception;
+
+
 }
