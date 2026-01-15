@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 import com.bitark.thread.ThreadUtils;
 import com.bitark.util.SnapshotManager;
+import com.bitark.wal.checkpoint.CheckpointManager;
+import com.bitark.wal.checkpoint.WalCheckpoint;
 import com.bitark.log.LogEntry;
 
 
@@ -21,8 +23,11 @@ import com.bitark.log.LogEntry;
 public class ReadServiceImpl implements ReadService {
 
   private static final String SNAPSHOT_PATH = "/home/qiushui/IdeaProjects/BitArk/snapshot.bin";
+  private static final String CHECKPOINT_PATH = "/home/qiushui/IdeaProjects/BitArk/wal/checkpoint.bin";
 
   ReadStatusEngine engine = new ReadStatusEngine();
+
+  CheckpointManager checkpointManager = new CheckpointManager(Path.of(CHECKPOINT_PATH));
 
   private final RestTemplate restTemplate = new RestTemplate();
 
@@ -117,6 +122,11 @@ public class ReadServiceImpl implements ReadService {
     log.info("开始保存 snapshot...");
     snapshotManager.save(engine);
     log.info("✅ Snapshot 已保存到: {}", SNAPSHOT_PATH);
+
+    WalCheckpoint cp = walEngine.currCheckpoint();
+    log.info("Current checkpoint: {}", cp);
+    checkpointManager.save(cp);
+    
   }
 
 

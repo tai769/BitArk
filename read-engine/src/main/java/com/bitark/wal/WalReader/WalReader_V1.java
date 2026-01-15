@@ -48,6 +48,26 @@ public class WalReader_V1 implements AutoCloseable{
 
     }
 
+
+
+
+    public long replay(String path, long startOffset, LogEntryHandler handler) throws Exception {
+        try(RandomAccessFile raf = new RandomAccessFile(path,"rw");
+            FileChannel channel = raf.getChannel();
+        ){
+            //从指定的 offset
+            channel.position(startOffset);
+
+            ByteBuffer buffer = ByteBuffer.allocate(LogEntry.ENTRY_SIZE);
+
+            while (true) {
+                long entryOffset = channel.position();
+                buffer.clear();
+                int bytesRead = readFull(channel, buffer);
+            }
+        }
+    }
+
     private int readFull(FileChannel channel,
                          ByteBuffer buffer) throws IOException {
         int totalRead = 0;

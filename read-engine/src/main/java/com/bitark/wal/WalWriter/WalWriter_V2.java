@@ -6,9 +6,8 @@ import org.slf4j.LoggerFactory;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import com.bitark.log.LogEntry;
-import com.bitark.log.LogEntryHandler;
-import com.bitark.engine.WalEngine;
 import com.bitark.wal.WalReader.WalReader_V1;
+import com.bitark.wal.checkpoint.WalCheckpoint;
 import com.bitark.wal.config.WalConfig;
 
 import java.io.File;
@@ -265,6 +264,11 @@ public class WalWriter_V2 implements AutoCloseable {
     }
 
 
+    public WalCheckpoint currentCheckpoint()throws IOException {
+        long pos = fileChannel.position();
+        return new WalCheckpoint(1, currentIndex, pos);
+    }
+
 
     @Data
     private static class WriteRequest {
@@ -277,4 +281,7 @@ public class WalWriter_V2 implements AutoCloseable {
 
         }
     }
+
+
+
 }

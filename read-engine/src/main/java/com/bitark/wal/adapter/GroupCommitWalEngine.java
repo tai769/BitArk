@@ -10,6 +10,7 @@ import com.bitark.log.LogEntryHandler;
 import com.bitark.engine.WalEngine;
 import com.bitark.wal.WalReader.WalReader_V1;
 import com.bitark.wal.WalWriter.WalWriter_V2;
+import com.bitark.wal.checkpoint.WalCheckpoint;
 import com.bitark.wal.config.WalConfig;
 
 public class GroupCommitWalEngine  implements WalEngine{
@@ -34,7 +35,7 @@ public class GroupCommitWalEngine  implements WalEngine{
     public Long replay(LogEntryHandler handler) throws Exception {
 
           //1. 列出目录下的文件
-       File dir = new File(config.getWalDir());
+        File dir = new File(config.getWalDir());
         String baseName = config.getWalFileName();          // 同理 getWalFileName()
 
         File[] files = dir.listFiles(f -> {
@@ -78,5 +79,11 @@ public class GroupCommitWalEngine  implements WalEngine{
     public void close() throws Exception {
         writer.close();
     }
+
+    @Override
+    public WalCheckpoint currCheckpoint() throws Exception {
+        return writer.currentCheckpoint();    
+    }
+
 
 }
