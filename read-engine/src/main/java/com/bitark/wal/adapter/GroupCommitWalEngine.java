@@ -85,5 +85,37 @@ public class GroupCommitWalEngine  implements WalEngine{
         return writer.currentCheckpoint();    
     }
 
+    @Override
+    public Long replayFrom(WalCheckpoint checkpoint, LogEntryHandler handler) throws Exception {
+        File dir = new File(config.getWalDir());
+        String baseName = config.getWalFileName();
+        File[] files = dir.listFiles(f -> {
+            String name = f.getName();
+            return name.startsWith(baseName + ".");
+        });
+
+        Arrays.sort(files, (f1, f2) -> {
+            int i1 = parseIndex(f1.getName(), baseName);
+            int i2 = parseIndex(f2.getName(), baseName);
+            return Integer.compare(i1, i2);
+        });
+
+        long lastOffset = 0L;
+        for(File f : files){
+            int idx = parseIndex(f.getName(), baseName);
+            String path = f.getAbsolutePath();
+
+            if (idx < checkpoint.getSegmentIndex()) {
+                continue; //旧文件全部跳过
+            }else if (idx == checkpoint.getSegmentIndex()) {
+                lastOffset = reader.replay(path, checkpoint.getSegmentOffset(), handler);
+            }else {
+                lastOffset = reader.replay(path, handler); // 从头读取
+            }
+        }
+        return lastOffset;
+
+    }
+
 
 }

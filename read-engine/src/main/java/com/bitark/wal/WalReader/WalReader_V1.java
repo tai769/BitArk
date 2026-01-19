@@ -64,6 +64,26 @@ public class WalReader_V1 implements AutoCloseable{
                 long entryOffset = channel.position();
                 buffer.clear();
                 int bytesRead = readFull(channel, buffer);
+                if (bytesRead == -1) {
+                    return entryOffset;
+                }
+
+                if (bytesRead < LogEntry.ENTRY_SIZE) {
+                    // 如果读取到的字段 < 21 说明最后一条日志是坏的
+                    log.error("Bad log entry at offset {}", entryOffset);
+                    channel.truncate(entryOffset);
+                    return entryOffset;
+                }
+                buffer.flip();
+                try {
+                    LogEntry entry = LogEntry.decode(buffer);
+                    handler.handle(entry);
+                }catch (RuntimeException e) {
+                    log.error("日志条目解析失败: {}", e.getMessage());
+                    channel.truncate(entryOffset);
+                    // 截断到当前条目的起始位置，丢弃损坏的数据
+                    return entryOffset;
+                }
             }
         }
     }

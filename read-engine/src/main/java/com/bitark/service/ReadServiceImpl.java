@@ -1,6 +1,8 @@
 package com.bitark.service;
 
+import java.io.FileNotFoundException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
@@ -80,27 +82,35 @@ public class ReadServiceImpl implements ReadService {
   public void recover() throws Exception {
     log.info("开始恢复内存状态...");
     Path snapshotPath = Paths.get(SNAPSHOT_PATH);
-    
+    WalCheckpoint cp = null;
+
+    // 1. 尝试 snapshot 恢复（失败也不中断）
     try {
-      // 1. 尝试从 snapshot 恢复
-      if (Files.exists(snapshotPath)) {
-        log.info("发现 snapshot 文件: {}", snapshotPath);
-        snapshotManager.load(engine);
-        log.info("✅ Snapshot 恢复成功");
-      } else {
-        log.warn("⚠️  Snapshot 文件不存在，将全量从 WAL 恢复");
-      }
+        if (Files.exists(snapshotPath)) {
+            snapshotManager.load(engine);
+            log.info("✅ Snapshot 恢复成功");
+        } else {
+            log.warn("Snapshot 文件不存在，将依赖 WAL 恢复");
+        }
     } catch (Exception e) {
-      log.error("❌ Snapshot 读取失败: {}，将全量从 WAL 恢复", e.getMessage());
+        log.error("Snapshot 读取失败，将依赖 WAL 恢复: {}", e.getMessage());
     }
-   
-    // 2. 从 WAL 回放（现在还是全量 replay，后续加 checkpoint 后会改成增量）
-    log.info("开始从 WAL 回放...");
-    walEngine.replay(entry -> {
-      engine.markRead(entry.getUserId(), entry.getMsgId());
-    });
-    log.info("✅ WAL 回放完成");
-    log.info("✅ 内存状态恢复完成");
+
+    // 2. 尝试读取 checkpoint（失败就退化成全量 replay）
+    try {
+        cp = checkpointManager.load();
+    } catch (NoSuchFileException | FileNotFoundException e) {
+        log.warn("Checkpoint 文件不存在，将使用全量 WAL 回放");
+    } catch (Exception e) {
+        log.error("Checkpoint 读取失败，将使用全量 WAL 回放", e);
+    }
+
+    // 3. 根据 cp 是否存在，决定用全量还是增量 replay
+    if (cp == null) {
+        walEngine.replay(entry -> engine.markRead(...));
+    } else {
+        walEngine.replayFrom(cp, entry -> engine.markRead(...));
+    }
   }
 
   @Override

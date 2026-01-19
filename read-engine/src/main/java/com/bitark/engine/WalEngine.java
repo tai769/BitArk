@@ -16,5 +16,6 @@ public interface WalEngine {
 
     WalCheckpoint currCheckpoint() throws Exception;
 
+    Long replayFrom(WalCheckpoint checkpoint, LogEntryHandler handler) throws Exception;
 
 }
