@@ -68,7 +68,7 @@ public class WalWriter_V2 implements AutoCloseable {
         try {
             initPosition = reader.replay(path, (LogEntry entry) -> {
                 //暂时只是打印,真正的恢复在WalEngine.replay做
-                log.info("Replay entry: {}", entry);
+                log.debug("Replay entry: {}", entry);
             });
            
         } catch (Exception e) {

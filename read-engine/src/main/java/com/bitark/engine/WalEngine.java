@@ -18,4 +18,7 @@ public interface WalEngine {
 
     Long replayFrom(WalCheckpoint checkpoint, LogEntryHandler handler) throws Exception;
 
+
+    void gcOldSegment(WalCheckpoint checkpoint) throws Exception;
+
 }

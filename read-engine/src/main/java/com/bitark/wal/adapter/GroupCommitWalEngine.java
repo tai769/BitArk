@@ -13,6 +13,10 @@ import com.bitark.wal.WalWriter.WalWriter_V2;
 import com.bitark.wal.checkpoint.WalCheckpoint;
 import com.bitark.wal.config.WalConfig;
 
+import lombok.extern.slf4j.Slf4j;
+
+
+@Slf4j
 public class GroupCommitWalEngine  implements WalEngine{
 
 
@@ -115,6 +119,36 @@ public class GroupCommitWalEngine  implements WalEngine{
         }
         return lastOffset;
 
+    }
+
+    @Override
+    public void gcOldSegment(WalCheckpoint checkpoint) throws Exception {
+        File dir = new File(config.getWalDir());
+        String baseName = config.getWalFileName();
+        File[] files = dir.listFiles(f -> 
+            f.getName().startsWith(config.getWalFileName() + "."));
+
+        if (files == null || files.length == 0) {
+            return;
+        }  
+        
+        int deletedCount = 0;
+        for(File f : files){
+            int idx = parseIndex(f.getName(), baseName);
+
+            // 只删除严格小于 checkpoint的文件(当前正在写的和未来的都保留)
+            if (idx < checkpoint.getSegmentIndex()) {
+                boolean deleted = f.delete();
+                if (deleted) {
+                    log.info("🗑️  GC deleted old segment: {}", f.getName());
+                    deletedCount++;
+                }else{
+                    log.warn("⚠️  Failed to delete: {}", f.getName());
+                }
+                
+            }
+        }
+        log.info("✅ GC completed. Deleted {} old segment(s)", deletedCount);
     }
 
 

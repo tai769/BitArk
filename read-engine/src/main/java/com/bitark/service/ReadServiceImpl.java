@@ -10,6 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.WalEngine;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 import com.bitark.thread.ThreadUtils;
@@ -79,6 +80,7 @@ public class ReadServiceImpl implements ReadService {
   }
 
   @Override
+  @PostConstruct
   public void recover() throws Exception {
     log.info("开始恢复内存状态...");
     Path snapshotPath = Paths.get(SNAPSHOT_PATH);
@@ -107,10 +109,12 @@ public class ReadServiceImpl implements ReadService {
 
     // 3. 根据 cp 是否存在，决定用全量还是增量 replay
     if (cp == null) {
-        walEngine.replay(entry -> engine.markRead(...));
+        walEngine.replay(entry -> engine.markRead(entry.getUserId(), entry.getMsgId()));
     } else {
-        walEngine.replayFrom(cp, entry -> engine.markRead(...));
+        walEngine.replayFrom(cp, entry -> engine.markRead(entry.getUserId(), entry.getMsgId()));
     }
+
+     log.info("✅ Recovery Complete. Engine instance ID: {}", System.identityHashCode(engine));
   }
 
   @Override
@@ -136,6 +140,10 @@ public class ReadServiceImpl implements ReadService {
     WalCheckpoint cp = walEngine.currCheckpoint();
     log.info("Current checkpoint: {}", cp);
     checkpointManager.save(cp);
+
+    //快照成功之后清理旧的segment
+    walEngine.gcOldSegment(cp);
+    log.info("✅ Old segments have been cleaned up");
     
   }
 
