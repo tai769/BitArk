@@ -20,12 +20,6 @@
             <artifactId>read-common</artifactId>
             <version>1.0.0</version>
         </dependency>
-
-        <dependency>
-            <groupId>com.example</groupId>
-            <artifactId>read-engine</artifactId>
-            <version>1.0.0</version>
-        </dependency>
         
         <dependency>
             <groupId>org.slf4j</groupId>
