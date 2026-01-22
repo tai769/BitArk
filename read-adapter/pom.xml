@@ -32,6 +32,12 @@
             <artifactId>read-engine</artifactId>
             <version>1.0.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>read-infrastructure</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         
         <!-- Spring Boot Web for REST APIs -->
         <dependency>

@@ -20,12 +20,6 @@
             <artifactId>read-common</artifactId>
             <version>${project.version}</version>
         </dependency>
-        
-        <dependency>
-            <groupId>com.example</groupId>
-            <artifactId>read-adapter</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -1,8 +1,8 @@
 package com.bitark.wal.WalReader;
 
 import lombok.extern.slf4j.Slf4j;
-import com.bitark.log.LogEntry;
-import com.bitark.log.LogEntryHandler;
+import log.LogEntry;
+import log.LogEntryHandler;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;

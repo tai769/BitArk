@@ -1,6 +1,6 @@
 package com.bitark.wal.config;
 
-import com.bitark.enums.WalMode;
+import enums.WalMode;
 
 import lombok.Data;
 

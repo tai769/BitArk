@@ -5,9 +5,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 
-import com.bitark.log.LogEntry;
-import com.bitark.log.LogEntryHandler;
-import com.bitark.engine.WalEngine;
+import log.LogEntry;
+import log.LogEntryHandler;
+import com.bitark.wal.WalEngine;
 import com.bitark.wal.WalReader.WalReader_V1;
 import com.bitark.wal.WalWriter.WalWriter_V2;
 import com.bitark.wal.checkpoint.WalCheckpoint;

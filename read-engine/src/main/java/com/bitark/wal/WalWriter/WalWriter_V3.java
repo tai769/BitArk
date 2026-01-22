@@ -1,6 +1,6 @@
 package com.bitark.wal.WalWriter;
 
-import com.bitark.log.LogEntry;
+import log.LogEntry;
 
 import java.io.File;
 import java.io.IOException;

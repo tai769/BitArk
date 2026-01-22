@@ -17,6 +17,8 @@
         
         <!-- 版本管理 -->
         <spring.boot.version>3.4.5</spring.boot.version>
+        <spring.framework.version>6.2.11</spring.framework.version>
+        <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
         <roaringbitmap.version>0.9.38</roaringbitmap.version>
         <log4j.version>2.22.1</log4j.version>
         <slf4j.version>2.0.17</slf4j.version>
@@ -30,6 +32,7 @@
         <module>read-cluster</module>
         <module>read-adapter</module>
         <module>read-client</module>
+        <module>test</module>
     </modules>
 
     <dependencyManagement>
@@ -39,6 +42,24 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-web</artifactId>
                 <version>${spring.boot.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-context</artifactId>
+                <version>${spring.framework.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-web</artifactId>
+                <version>${spring.framework.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>jakarta.annotation</groupId>
+                <artifactId>jakarta.annotation-api</artifactId>
+                <version>${jakarta.annotation.version}</version>
             </dependency>
             
             <!-- RoaringBitmap for compressed bitmap data structures -->

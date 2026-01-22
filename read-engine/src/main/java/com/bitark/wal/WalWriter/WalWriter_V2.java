@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import com.bitark.log.LogEntry;
+import log.LogEntry;
 import com.bitark.wal.WalReader.WalReader_V1;
 import com.bitark.wal.checkpoint.WalCheckpoint;
 import com.bitark.wal.config.WalConfig;

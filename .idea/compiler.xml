@@ -8,9 +8,10 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="read-client" />
-        <module name="read-engine" />
+        <module name="test" />
         <module name="read-cluster" />
         <module name="read-infrastructure" />
+        <module name="read-engine" />
         <module name="read-common" />
         <module name="read-adapter" />
       </profile>
