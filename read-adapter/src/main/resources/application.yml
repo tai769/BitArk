@@ -17,6 +17,10 @@ wal:
   file-name: wal.log
   mode: group_commit
   max-file-size-bytes: 4096
+recovery:
+  snapshot-path: /home/qiushui/IdeaProjects/BitArk/snapshot.bin
+  checkpoint-path: /home/qiushui/IdeaProjects/BitArk/wal/checkpoint.bin
+
 
 # 日志配置
 logging:

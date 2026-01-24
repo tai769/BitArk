@@ -39,21 +39,7 @@ public class GroupCommitWalEngine  implements WalEngine{
     public Long replay(LogEntryHandler handler) throws Exception {
 
           //1. 列出目录下的文件
-        File dir = new File(config.getWalDir());
-        String baseName = config.getWalFileName();          // 同理 getWalFileName()
-
-        File[] files = dir.listFiles(f -> {
-            String name = f.getName();
-            return name.startsWith(baseName + ".");
-        });
-         if (files == null || files.length == 0) {
-            return 0L;
-        }
-        Arrays.sort(files, (f1, f2) -> {
-        int i1 = parseIndex(f1.getName(), baseName);
-        int i2 = parseIndex(f2.getName(), baseName);
-        return Integer.compare(i1, i2);
-    });
+        File[] files = listAndSortSegments();
 
         long lastOffset = 0L;
         for (File f : files) {
@@ -91,18 +77,8 @@ public class GroupCommitWalEngine  implements WalEngine{
 
     @Override
     public Long replayFrom(WalCheckpoint checkpoint, LogEntryHandler handler) throws Exception {
-        File dir = new File(config.getWalDir());
         String baseName = config.getWalFileName();
-        File[] files = dir.listFiles(f -> {
-            String name = f.getName();
-            return name.startsWith(baseName + ".");
-        });
-
-        Arrays.sort(files, (f1, f2) -> {
-            int i1 = parseIndex(f1.getName(), baseName);
-            int i2 = parseIndex(f2.getName(), baseName);
-            return Integer.compare(i1, i2);
-        });
+        File[] files = listAndSortSegments();
 
         long lastOffset = 0L;
         for(File f : files){
@@ -123,14 +99,8 @@ public class GroupCommitWalEngine  implements WalEngine{
 
     @Override
     public void gcOldSegment(WalCheckpoint checkpoint) throws Exception {
-        File dir = new File(config.getWalDir());
         String baseName = config.getWalFileName();
-        File[] files = dir.listFiles(f -> 
-            f.getName().startsWith(config.getWalFileName() + "."));
-
-        if (files == null || files.length == 0) {
-            return;
-        }  
+        File[] files = listAndSortSegments();
         
         int deletedCount = 0;
         for(File f : files){
@@ -146,10 +116,31 @@ public class GroupCommitWalEngine  implements WalEngine{
                     log.warn("⚠️  Failed to delete: {}", f.getName());
                 }
                 
+            }else {
+
+                log.info("✅ GC keep segment: {}", f.getName());
+                break;
             }
         }
         log.info("✅ GC completed. Deleted {} old segment(s)", deletedCount);
     }
 
+    private File[] listAndSortSegments(){
+        String walDir = config.getWalDir();
+        String baseName = config.getWalFileName();
+        File[] files = new File(walDir).listFiles( f ->
+                f.getName().startsWith(baseName + "."));
 
+        if (files == null || files.length == 0){
+            log.warn("⚠️  No segment files found in {}", walDir);
+            return new File[0];
+        }
+        Arrays.sort(files, (f1, f2) -> {
+            int i1 = parseIndex(f1.getName(), baseName);
+            int i2 = parseIndex(f2.getName(), baseName);
+            return Integer.compare(i1, i2);
+        });
+
+        return files;
+    }
 }
