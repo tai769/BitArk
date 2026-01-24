@@ -1,8 +1,5 @@
 package test;
 
-import com.bitark.service.ReadServiceImpl;
-
-
 
 public class ServiceTest {
 

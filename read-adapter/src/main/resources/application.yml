@@ -21,6 +21,9 @@ recovery:
   snapshot-path: /home/qiushui/IdeaProjects/BitArk/snapshot.bin
   checkpoint-path: /home/qiushui/IdeaProjects/BitArk/wal/checkpoint.bin
 
+replication:
+  slave-url: http://127.0.0.1:8081/internal/sync
+
 
 # 日志配置
 logging:

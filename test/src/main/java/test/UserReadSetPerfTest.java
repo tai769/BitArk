@@ -1,7 +1,7 @@
 package test;
 
 import com.bitark.engine.ReadStatusEngine;
-import enums.UserReadSetMode;
+import com.bitark.enums.UserReadSetMode;
 
 public class UserReadSetPerfTest {
     public static void main(String[] args) {

@@ -1,7 +1,5 @@
 package test;
 
-import com.bitark.service.ReadServiceImpl;
-
 public class MasterTest {
     public static void main(String[] args) throws Exception {
         System.out.println("=== 开始测试 ReadService ===");

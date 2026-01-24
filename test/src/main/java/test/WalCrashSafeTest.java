@@ -1,10 +1,10 @@
 package test;
 
 import com.bitark.engine.ReadStatusEngine;
-import com.bitark.wal.WalEngine;
-import com.bitark.wal.WalEngines;
-import log.LogEntry;
-import com.bitark.wal.config.WalConfig;
+import com.bitark.engine.wal.WalEngine;
+import com.bitark.engine.wal.WalEngines;
+import com.bitark.log.LogEntry;
+import com.bitark.engine.config.WalConfig;
 
 public class WalCrashSafeTest {
 

@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.nio.file.Paths;
 
 import com.bitark.engine.ReadStatusEngine;
-import enums.UserReadSetMode;
-import com.bitark.util.SnapshotManager;
+import com.bitark.engine.recover.SnapshotManager;
+import com.bitark.enums.UserReadSetMode;
 
 public class SnapshotTest {
 

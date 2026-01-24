@@ -15,12 +15,7 @@
     <packaging>jar</packaging>
 
     <dependencies>
-        <dependency>
-            <groupId>com.example</groupId>
-            <artifactId>read-infrastructure</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-        
+
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>read-common</artifactId>
@@ -73,7 +68,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot</artifactId>
             <version>3.5.7</version>
-            <scope>compile</scope>
         </dependency>
+
     </dependencies>
 </project>

@@ -5,7 +5,7 @@ public class WalTest {
 
 /*
     public static void main(String[] args) {
-        // 测试wal reader 和wal writer
+        // 测试wal reader 和wal wr2iter
         WalWriter_V2 walWriter;
         try {
             walWriter = new WalWriter_V2("wal.log", 0);
