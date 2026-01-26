@@ -1,4 +1,4 @@
-package com.bitark.engine.checkpoint;
+package com.bitark.commons.wal;
 
 import lombok.Data;
 
@@ -12,5 +12,13 @@ public class WalCheckpoint {
         this.version = version;
         this.segmentIndex = segmentIndex;
         this.segmentOffset = segmentOffset;
+    }
+
+    public int compareTo(WalCheckpoint other){
+        int cmp = Long.compare(this.segmentIndex,other.segmentIndex);
+        if (cmp != 0) {
+            return cmp;
+        }
+        return Long.compare(this.segmentOffset,other.segmentOffset);
     }
 }

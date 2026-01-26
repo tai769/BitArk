@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.bitark.engine.userset.RoaringUserReadSet;
 import com.bitark.engine.userset.SetBasedUserReadSet;
 import com.bitark.engine.userset.UserReadSet;
-import com.bitark.enums.UserReadSetMode;
+import com.bitark.commons.enums.UserReadSetMode;
 
 import lombok.extern.slf4j.Slf4j;
 

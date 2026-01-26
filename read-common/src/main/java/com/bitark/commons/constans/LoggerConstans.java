@@ -1,4 +1,4 @@
-package com.bitark.commons;
+package com.bitark.commons.constans;
 
 public enum LoggerConstans {
     TEST_LOGGER_NAME("test_logger");

@@ -3,7 +3,7 @@ package test;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.wal.WalEngine;
 import com.bitark.engine.wal.WalEngines;
-import com.bitark.log.LogEntry;
+import com.bitark.commons.log.LogEntry;
 import com.bitark.engine.config.WalConfig;
 
 public class WalCrashSafeTest {

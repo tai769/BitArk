@@ -1,4 +1,4 @@
-package com.bitark.enums;
+package com.bitark.commons.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

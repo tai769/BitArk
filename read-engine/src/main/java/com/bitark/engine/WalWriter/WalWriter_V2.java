@@ -5,9 +5,9 @@ import org.slf4j.LoggerFactory;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import com.bitark.log.LogEntry;
+import com.bitark.commons.log.LogEntry;
+import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.WalReader.WalReader_V1;
-import com.bitark.engine.checkpoint.WalCheckpoint;
 import com.bitark.engine.config.WalConfig;
 
 import java.io.File;
@@ -159,18 +159,18 @@ public class WalWriter_V2 implements AutoCloseable {
     /*
      * 优化点2 ： 返回Future, 支持强一致性等待
      */
-    public CompletableFuture<Boolean> append(LogEntry entry) {
+    public CompletableFuture<WalCheckpoint> append(LogEntry entry) {
         if (!running.get()) {
             throw new IllegalStateException("WalWriter is closed");
         }
         WriteRequest req = new WriteRequest(entry);
         if (!queue.offer(req)) {
             // 队列满
-            CompletableFuture<Boolean> fail = new CompletableFuture<>();
+            CompletableFuture<WalCheckpoint> fail = new CompletableFuture<>();
             fail.completeExceptionally(new RuntimeException("WalWriter queue is full"));
-            return fail;
+            return fail; // Changed from return fail.completedFuture(true);
         }
-        return req.futrue;
+        return req.futrue; // Changed from return req.futrue.complete(true);
     }
 
     private void ioLoop() {
@@ -195,13 +195,17 @@ public class WalWriter_V2 implements AutoCloseable {
                     if (writeBuffer.remaining() < LogEntry.ENTRY_SIZE) {
                         flush();
                     }
+
+                    // 在数据塞进buffer之前,记录位置
+                    Long lsnOffset = writeBuffer.position() + fileChannel.position();
+                    req.assignedLsn = new WalCheckpoint(1, currentIndex, lsnOffset);
                     req.entry.encode(writeBuffer);
                 }
                 flush();
 
                 // 优化点4 落盘成功后， 统一回调
                 for (WriteRequest req : batch) {
-                    req.futrue.complete(true);
+                    req.futrue.complete(req.assignedLsn);
                 }
                 batch.clear();
             } catch (Exception e) {
@@ -273,8 +277,8 @@ public class WalWriter_V2 implements AutoCloseable {
     @Data
     private static class WriteRequest {
         final LogEntry entry;
-        final CompletableFuture<Boolean> futrue;
-
+        final CompletableFuture<WalCheckpoint> futrue;
+        WalCheckpoint assignedLsn;
         WriteRequest(LogEntry entry) {
             this.entry = entry;
             this.futrue = new CompletableFuture<>();

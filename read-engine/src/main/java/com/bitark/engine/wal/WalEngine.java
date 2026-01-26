@@ -1,15 +1,14 @@
 package com.bitark.engine.wal;
 
-import com.bitark.engine.checkpoint.WalCheckpoint;
-import com.bitark.log.LogEntry;
-import com.bitark.log.LogEntryHandler;
+import com.bitark.commons.log.LogEntry;
+import com.bitark.commons.log.LogEntryHandler;
+import com.bitark.commons.wal.WalCheckpoint;
 
-import java.util.concurrent.CompletableFuture;
 
 
 public interface WalEngine {
 
-    CompletableFuture<Boolean> append(LogEntry entry);
+    WalCheckpoint append(LogEntry entry);
 
     Long replay(LogEntryHandler handler) throws Exception;
 

@@ -1,4 +1,4 @@
-package com.bitark.log;
+package com.bitark.commons.log;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

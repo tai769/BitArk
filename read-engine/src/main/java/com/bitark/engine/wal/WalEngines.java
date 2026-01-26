@@ -1,6 +1,6 @@
 package com.bitark.engine.wal;
 
-import com.bitark.enums.WalMode;
+import com.bitark.commons.enums.WalMode;
 import com.bitark.engine.adapter.GroupCommitWalEngine;
 import com.bitark.engine.config.WalConfig;
 

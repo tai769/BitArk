@@ -1,6 +1,6 @@
 package com.bitark.engine.WalWriter;
 
-import com.bitark.log.LogEntry;
+import com.bitark.commons.log.LogEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

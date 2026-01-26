@@ -5,7 +5,7 @@ import java.nio.file.Paths;
 
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.recover.SnapshotManager;
-import com.bitark.enums.UserReadSetMode;
+import com.bitark.commons.enums.UserReadSetMode;
 
 public class SnapshotTest {
 

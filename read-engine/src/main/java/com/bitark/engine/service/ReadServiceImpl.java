@@ -15,8 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 import com.bitark.engine.recover.SnapshotManager;
 import com.bitark.engine.checkpoint.CheckpointManager;
-import com.bitark.engine.checkpoint.WalCheckpoint;
-import com.bitark.log.LogEntry;
+import com.bitark.commons.log.LogEntry;
+import com.bitark.commons.wal.WalCheckpoint;
 
 
 

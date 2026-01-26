@@ -7,10 +7,10 @@ import java.util.concurrent.CompletableFuture;
 
 import com.bitark.engine.WalReader.WalReader_V1;
 import com.bitark.engine.WalWriter.WalWriter_V2;
-import com.bitark.engine.checkpoint.WalCheckpoint;
 import com.bitark.engine.config.WalConfig;
-import com.bitark.log.LogEntry;
-import com.bitark.log.LogEntryHandler;
+import com.bitark.commons.log.LogEntry;
+import com.bitark.commons.log.LogEntryHandler;
+import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.wal.WalEngine;
 
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +31,18 @@ public class GroupCommitWalEngine  implements WalEngine{
     }
 
     @Override
-    public CompletableFuture<Boolean> append(LogEntry entry) {
-        return writer.append(entry);
+    public WalCheckpoint append(LogEntry entry) {
+        try{
+            //1. 调用底层的append 
+            CompletableFuture<WalCheckpoint> 
+            future = writer.append(entry);
+
+            //2. 关键调用.join同步等待磁盘写入返回lsn
+            return future.join();
+        }catch(Exception e){
+            log.error("WAL append error", e);
+            throw new RuntimeException("Failed to append WAL", e);
+        }
     }
 
     @Override
