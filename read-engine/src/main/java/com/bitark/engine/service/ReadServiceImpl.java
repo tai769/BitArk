@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.config.RecoveryConfig;
@@ -15,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 import com.bitark.engine.recover.SnapshotManager;
 import com.bitark.engine.checkpoint.CheckpointManager;
+import com.bitark.commons.dto.ReplicationAck;
+import com.bitark.commons.dto.ReplicationRequest;
 import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.wal.WalCheckpoint;
 
@@ -23,7 +26,9 @@ import com.bitark.commons.wal.WalCheckpoint;
 
 @Slf4j
 public class ReadServiceImpl implements ReadService {
+    
 
+    private final ConcurrentHashMap<String, WalCheckpoint> slaveAckMap = new ConcurrentHashMap<>();
 
     private final RecoveryConfig recoveryConfig;
 
@@ -56,7 +61,7 @@ public class ReadServiceImpl implements ReadService {
     public void read(Long userId, Long msgId) throws Exception {
         try {
             LogEntry entry = new LogEntry(LogEntry.READ_ENTRY, userId, msgId);
-            walEngine.append(entry);
+            WalCheckpoint lsn = walEngine.append(entry);;
             engine.markRead(userId, msgId);
 
             /*
@@ -64,13 +69,29 @@ public class ReadServiceImpl implements ReadService {
              */
 
             executorService.submit(() -> {
-                // 1. 先获取路由
-                String slaveUrl = replicationConfig.getSlaveUrl()+"?userId=" + userId + "&msgId=" + msgId;
-
-                // 2. 发送同步请求
+                
                 try {
-                    restTemplate.postForObject(slaveUrl, null, String.class);
-                    log.info("sync success");
+
+                    //1.  构建Json请求 
+                    ReplicationRequest request = new ReplicationRequest();
+                    request.setUserId(userId);
+                    request.setMsgId(msgId);
+                    request.setSegmentIndex(lsn.getSegmentIndex());
+                    request.setOffset(lsn.getSegmentOffset());
+
+                    //2. 发送Json请求(注意Url变了, 不再带参数)
+                    String url = replicationConfig.getSlaveUrl();
+
+                    //3. 接受回执
+                    ReplicationAck ack = restTemplate.postForObject(url, request, ReplicationAck.class);;
+
+                    //4. 登记账本(记录这个Slave的最新进度)
+                    if (ack != null) {
+                        WalCheckpoint slaveCheckpoint = ack.toCheckpoint();
+                        slaveAckMap.put(url, slaveCheckpoint);
+                        log.info("✅ Slave ACK: segmentIndex={}, offset={}", 
+                                slaveCheckpoint.getSegmentIndex(), slaveCheckpoint.getSegmentOffset());
+                    }
                 } catch (Exception e) {
                     log.error("sync error", e);
                 }
@@ -141,14 +162,46 @@ public class ReadServiceImpl implements ReadService {
         snapshotManager.save(engine);
         log.info("✅ Snapshot 已保存到: {}", recoveryConfig.getSnapshotPath());
 
-        WalCheckpoint cp = walEngine.currCheckpoint();
-        log.info("Current checkpoint: {}", cp);
-        checkpointManager.save(cp);
+        WalCheckpoint masterCheckpoint = walEngine.currCheckpoint();
+        
+        log.info("Current checkpoint: {}", masterCheckpoint);
+        checkpointManager.save(masterCheckpoint);
 
-        //快照成功之后清理旧的segment
-        walEngine.gcOldSegment(cp);
+
+        WalCheckpoint minSlaveCheckpoint = getMinSlaveAckLSN();
+
+        WalCheckpoint safeCheckpoint;
+        log.info("Min slave checkpoint: {}", minSlaveCheckpoint);
+        if (minSlaveCheckpoint == null) {
+            // 没有slave,用master自己的进度
+            safeCheckpoint = masterCheckpoint;
+            log.info("No slaves, using master checkpoint: {}", safeCheckpoint);
+           
+        }else{
+            // 有slave 必须要等最慢的slave
+            safeCheckpoint = minSlaveCheckpoint.compareTo(masterCheckpoint) < 0 ? minSlaveCheckpoint : masterCheckpoint;
+            log.info("🧹 GC Safe Point (slowest slave): {}", safeCheckpoint);
+        }
+        walEngine.gcOldSegment(safeCheckpoint);
         log.info("✅ Old segments have been cleaned up");
+            
+    }
 
+    /*
+    * 获取slave中进度最慢的那个lsn ,用于决定WAL GC的安全水位线
+    */
+    private WalCheckpoint getMinSlaveAckLSN(){
+        if (slaveAckMap.isEmpty()) {
+            return null;
+        }
+        WalCheckpoint minCheckpoint = null;
+        for(WalCheckpoint cp : slaveAckMap.values()){
+            if (minCheckpoint == null || cp.compareTo(minCheckpoint) < 0) {
+                minCheckpoint = cp;
+            }
+        }
+        return minCheckpoint;
+        
     }
 
 

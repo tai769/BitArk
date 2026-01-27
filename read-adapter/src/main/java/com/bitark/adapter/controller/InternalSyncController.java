@@ -22,7 +22,7 @@ public class InternalSyncController {
     private ReadService readService;
 
     @PostMapping("/sync")
-    public String sync(@RequestBody ReplicationRequest req)throws Exception {
+    public ReplicationAck sync(@RequestBody ReplicationRequest req)throws Exception {
         try {
             // 1. 调用本地业务逻辑（它内部会写 WAL 并产生本地进度）
             // 注意：这里我们目前直接透传 Master 的 LSN 作为 ACK 即可，
@@ -33,7 +33,7 @@ public class InternalSyncController {
             ReplicationAck ack = new ReplicationAck();
             ack.setAckSegmentIndex(req.getSegmentIndex());
             ack.setAckOffset(req.getOffset());
-            return "ack";
+            return ack;
         } catch (Exception e) {
             throw new RuntimeException("sync failed", e);
         }

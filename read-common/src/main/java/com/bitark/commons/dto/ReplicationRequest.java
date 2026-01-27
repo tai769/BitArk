@@ -9,7 +9,7 @@ public class ReplicationRequest {
     private Long msgId;
     
     // 关键：带上 Master 的坐标
-    private long segmentIndex;
+    private int segmentIndex;
     private long offset;
 
 }

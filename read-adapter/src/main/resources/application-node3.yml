@@ -1,14 +1,45 @@
 server:
-  port: 8082  # 节点3端口
+  port: 8082  # 可以根据需要修改端口
 
 spring:
   application:
-    name: read-adapter-node3  # 应用名称
+    name: read-service  # 应用名称
+
+# Web相关配置
+servlet:
+  multipart:
+    max-file-size: 10MB
+    max-request-size: 10MB
+
+
+wal:
+  dir: /home/qiushui/IdeaProjects/BitArk/wal
+  file-name: wal.log
+  mode: group_commit
+  max-file-size-bytes: 4096
+recovery:
+  snapshot-path: /home/qiushui/IdeaProjects/BitArk/snapshot.bin
+  checkpoint-path: /home/qiushui/IdeaProjects/BitArk/wal/checkpoint.bin
+
+replication:
+  slave-url: http://127.0.0.1:8081/internal/sync
+
 
 # 日志配置
 logging:
   level:
     root: INFO
     adapter: DEBUG
+    org.springframework.web: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/read-adapter.log
+
+# 自定义配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
