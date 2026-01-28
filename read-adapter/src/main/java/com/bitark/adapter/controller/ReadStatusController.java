@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 import com.bitark.engine.service.ReadServiceImpl;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/read")
 public class ReadStatusController {
 
     @Resource
