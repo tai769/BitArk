@@ -1,6 +1,7 @@
 package com.bitark.adapter.controller;
 
 import com.bitark.engine.config.ReplicationConfig;
+import com.bitark.engine.replication.ReplicationService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,19 +24,26 @@ import com.bitark.engine.service.ReadService;
 public class InternalSyncController {
 
     @Resource
-    private ReadService readService;
+    private ReplicationService  replicationService;
 
 
     @PostMapping("/sync")
     public ReplicationAck sync(@RequestBody ReplicationRequest req)throws Exception {
-        ReplicationAck ack = readService.applyReplication( req);
+        ReplicationAck ack = replicationService.sync( req);
         return ack;
     }
 
     @PostMapping("/register")
     public String register(@RequestBody ReplicationAck ack){
-        readService.getSlaveAckMap().put(ack.getSlaveUrl(), ack.toLsnPosition());
+        replicationService.register(ack);
          log.info("📢 Slave Registered: {} at {}", ack.getSlaveUrl(), ack.toLsnPosition());
          return "ok";
+    }
+
+    @PostMapping("/heartbeat")
+    public String heartbeat(@RequestBody ReplicationAck ack){
+
+        log.info("📢 Slave Heartbeat: {} at {}", ack.getSlaveUrl(), ack.toLsnPosition());
+        return "ok";
     }
 }

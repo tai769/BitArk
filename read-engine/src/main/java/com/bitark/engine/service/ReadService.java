@@ -21,7 +21,5 @@ public interface ReadService {
     void snapshot() throws Exception;
 
 
-    ConcurrentHashMap<String, LsnPosition> getSlaveAckMap();
-
     ReplicationAck applyReplication(ReplicationRequest req) throws Exception;
 }

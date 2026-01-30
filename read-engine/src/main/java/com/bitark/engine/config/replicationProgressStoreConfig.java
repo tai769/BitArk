@@ -1,6 +1,5 @@
-package com.bitark.adapter.config;
+package com.bitark.engine.config;
 
-import com.bitark.engine.config.ReplicationConfig;
 import com.bitark.engine.replication.ReplicationProgressStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
