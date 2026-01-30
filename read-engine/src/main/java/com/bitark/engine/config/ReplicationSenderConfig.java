@@ -14,6 +14,6 @@ public class ReplicationSenderConfig {
     @Bean
     public ReplicationSender replicationSender(RestTemplate restTemplate, ReplicationConfig replicationConfig, ReplicationTracker replicationTracker
     , ExecutorService executorService) {
-        return new HttpReplicationSender(restTemplate, replicationConfig, executorService, replicationTracker);
+        return new HttpReplicationSender(restTemplate, replicationConfig, replicationTracker, executorService);
     }
 }

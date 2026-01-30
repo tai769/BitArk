@@ -15,6 +15,7 @@ import com.bitark.engine.config.RecoveryConfig;
 import com.bitark.engine.replication.ReplicationProgressStore;
 import com.bitark.engine.replication.ReplicationTracker;
 import com.bitark.engine.replication.network.ReplicationSender;
+import com.bitark.engine.replication.reporter.ReplicationReporter;
 import com.bitark.engine.wal.WalEngine;
 import com.bitark.engine.config.ReplicationConfig;
 import jakarta.annotation.PostConstruct;
@@ -34,6 +35,7 @@ import com.bitark.commons.wal.WalCheckpoint;
 public class ReadServiceImpl implements ReadService {
 
 
+    private final ReplicationReporter replicationReporter;
     private final ReplicationTracker replicationTracker;
     private final RecoveryConfig recoveryConfig;
 
@@ -51,7 +53,8 @@ public class ReadServiceImpl implements ReadService {
     private SnapshotManager snapshotManager;
 
     public ReadServiceImpl(WalEngine walEngine, RecoveryConfig recoveryConfig, ReplicationProgressStore replicationProgressStore, ReplicationSender replicationSender,
-    ReplicationTracker replicationTracker) throws Exception {
+    ReplicationTracker replicationTracker , ReplicationReporter replicationReporter) throws Exception {
+        this.replicationReporter = replicationReporter;
         this.replicationTracker = replicationTracker;
         this.recoveryConfig = recoveryConfig;
         this.replicationSender = replicationSender;
@@ -119,7 +122,7 @@ public class ReadServiceImpl implements ReadService {
         try{
             LsnPosition masterLsn = replicationProgressStore.load();
             if (masterLsn != null){
-                reportStatus(masterLsn);
+                replicationReporter.reportStartup(masterLsn);
             }
             log.info("✅ Recovery Complete. Engine instance ID: {}", System.identityHashCode(engine));
         }catch (Exception e){
@@ -128,25 +131,7 @@ public class ReadServiceImpl implements ReadService {
 
     }
 
-    private void reportStatus(LsnPosition lsn) {
-        try{
-            String masterUrl = replicationConfig.getMasterUrl();
-            if (masterUrl == null || masterUrl.isBlank()){
-                return;
-            }
-            String myUrl = replicationConfig.getSelfUrl(); // 获取自己的地址
-            ReplicationAck myAck = new ReplicationAck();
-            myAck.setSlaveUrl(myUrl); // 需在配置中定义
-            myAck.setAckSegmentIndex(lsn.getSegmentIndex());
-            myAck.setAckOffset(lsn.getOffset());
 
-            restTemplate.postForObject(masterUrl + "/internal/register", myAck, String.class);
-            log.info("✅ 首次注册上报成功: {}", lsn);
-
-        }catch (Exception e){
-            log.error("首次注册上报失败", e);
-        }
-    }
 
     @Override
     public boolean isRead(Long userId, Long msgId) {

@@ -14,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class ReplicationServiceImpl implements ReplicationService {
 
-    private final ConcurrentHashMap<String, LsnPosition> ackMap = new ConcurrentHashMap<>();
 
     private final ReadService readService;
     private final ReplicationTracker tracker;
@@ -36,5 +35,5 @@ public class ReplicationServiceImpl implements ReplicationService {
         return "ok";
     }
 
- 
+
 }
