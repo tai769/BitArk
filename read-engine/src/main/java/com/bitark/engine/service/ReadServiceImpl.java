@@ -7,8 +7,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+
+import com.bitark.commons.lsn.LsnPosition;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.config.RecoveryConfig;
+import com.bitark.engine.replication.ReplicationProgressStore;
 import com.bitark.engine.wal.WalEngine;
 import com.bitark.engine.config.ReplicationConfig;
 import jakarta.annotation.PostConstruct;
@@ -28,7 +31,7 @@ import com.bitark.commons.wal.WalCheckpoint;
 public class ReadServiceImpl implements ReadService {
     
 
-    private final ConcurrentHashMap<String, WalCheckpoint> slaveAckMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, LsnPosition> slaveAckLsn = new ConcurrentHashMap<>();
 
     private final RecoveryConfig recoveryConfig;
 
@@ -43,10 +46,12 @@ public class ReadServiceImpl implements ReadService {
 
     private final ExecutorService executorService;
 
+    private final ReplicationProgressStore replicationProgressStore;
+
     private final WalEngine walEngine;
     private SnapshotManager snapshotManager;
 
-    public ReadServiceImpl(WalEngine walEngine, RecoveryConfig recoveryConfig, RestTemplate restTemplate, ReplicationConfig replicationConfig, ExecutorService executorService) throws Exception {
+    public ReadServiceImpl(WalEngine walEngine, RecoveryConfig recoveryConfig, RestTemplate restTemplate, ReplicationConfig replicationConfig, ExecutorService executorService, ReplicationProgressStore replicationProgressStore) throws Exception {
         this.recoveryConfig = recoveryConfig;
         this.restTemplate = restTemplate;
         this.replicationConfig = replicationConfig;
@@ -54,6 +59,7 @@ public class ReadServiceImpl implements ReadService {
         this.walEngine = walEngine;
         this.snapshotManager = new SnapshotManager(Paths.get(recoveryConfig.getSnapshotPath()));
         this.checkpointManager = new CheckpointManager(Paths.get(recoveryConfig.getCheckpointPath()));
+        this.replicationProgressStore = replicationProgressStore;
     }
 
     // 只负责 wal的操作
@@ -80,17 +86,22 @@ public class ReadServiceImpl implements ReadService {
                     request.setOffset(lsn.getSegmentOffset());
 
                     //2. 发送Json请求(注意Url变了, 不再带参数)
-                    String url = replicationConfig.getSlaveUrl();
+                    String slaveUrl = replicationConfig.getSlaveUrl();
 
                     //3. 接受回执
-                    ReplicationAck ack = restTemplate.postForObject(url, request, ReplicationAck.class);;
+                    ReplicationAck ack = restTemplate.postForObject(slaveUrl, request, ReplicationAck.class);;
 
                     //4. 登记账本(记录这个Slave的最新进度)
                     if (ack != null) {
-                        WalCheckpoint slaveCheckpoint = ack.toCheckpoint();
-                        slaveAckMap.put(url, slaveCheckpoint);
-                        log.info("✅ Slave ACK: segmentIndex={}, offset={}", 
-                                slaveCheckpoint.getSegmentIndex(), slaveCheckpoint.getSegmentOffset());
+                        String slaveId = ack.getSlaveUrl();
+                        if(slaveId != null && !slaveId.isBlank()){
+                            log.info("✅ Slave: {}", slaveId);
+                            LsnPosition slaveCheckpoint = new LsnPosition(ack.getAckSegmentIndex(), ack.getAckOffset());
+
+                            slaveAckLsn.put(slaveId, slaveCheckpoint);
+                            log.info("✅ Slave ACK: segmentIndex={}, offset={}",
+                                    slaveCheckpoint.getSegmentIndex(), slaveCheckpoint.getOffset());
+                        }
                     }
                 } catch (Exception e) {
                     log.error("sync error", e);
@@ -109,7 +120,7 @@ public class ReadServiceImpl implements ReadService {
     public void recover() throws Exception {
         log.info("开始恢复内存状态...");
         Path snapshotPath = Paths.get(recoveryConfig.getSnapshotPath());
-        WalCheckpoint cp = null;
+        WalCheckpoint localCheckpoint = null;
 
         // 1. 尝试 snapshot 恢复（失败也不中断）
         try {
@@ -125,7 +136,7 @@ public class ReadServiceImpl implements ReadService {
 
         // 2. 尝试读取 checkpoint（失败就退化成全量 replay）
         try {
-            cp = checkpointManager.load();
+            localCheckpoint = checkpointManager.load();
         } catch (NoSuchFileException | FileNotFoundException e) {
             log.warn("Checkpoint 文件不存在，将使用全量 WAL 回放");
         } catch (Exception e) {
@@ -133,13 +144,42 @@ public class ReadServiceImpl implements ReadService {
         }
 
         // 3. 根据 cp 是否存在，决定用全量还是增量 replay
-        if (cp == null) {
+        if (localCheckpoint == null) {
             walEngine.replay(entry -> engine.markRead(entry.getUserId(), entry.getMsgId()));
         } else {
-            walEngine.replayFrom(cp, entry -> engine.markRead(entry.getUserId(), entry.getMsgId()));
+            walEngine.replayFrom(localCheckpoint, entry -> engine.markRead(entry.getUserId(), entry.getMsgId()));
         }
 
-        log.info("✅ Recovery Complete. Engine instance ID: {}", System.identityHashCode(engine));
+        try{
+            LsnPosition masterLsn = replicationProgressStore.load();
+            if (masterLsn != null){
+                reportStatus(masterLsn);
+            }
+            log.info("✅ Recovery Complete. Engine instance ID: {}", System.identityHashCode(engine));
+        }catch (Exception e){
+            log.error("Recovery Complete with error", e);
+        }
+
+    }
+
+    private void reportStatus(LsnPosition lsn) {
+        try{
+            String masterUrl = replicationConfig.getMasterUrl();
+            if (masterUrl == null || masterUrl.isBlank()){
+                return;
+            }
+            String myUrl = replicationConfig.getSelfUrl(); // 获取自己的地址
+            ReplicationAck myAck = new ReplicationAck();
+            myAck.setSlaveUrl(myUrl); // 需在配置中定义
+            myAck.setAckSegmentIndex(lsn.getSegmentIndex());
+            myAck.setAckOffset(lsn.getOffset());
+
+            restTemplate.postForObject(masterUrl + "/internal/register", myAck, String.class);
+            log.info("✅ 首次注册上报成功: {}", lsn);
+
+        }catch (Exception e){
+            log.error("首次注册上报失败", e);
+        }
     }
 
     @Override
@@ -191,21 +231,40 @@ public class ReadServiceImpl implements ReadService {
     * 获取slave中进度最慢的那个lsn ,用于决定WAL GC的安全水位线
     */
     private WalCheckpoint getMinSlaveAckLSN(){
-        if (slaveAckMap.isEmpty()) {
+        if (slaveAckLsn.isEmpty()) {
             return null;
         }
-        WalCheckpoint minCheckpoint = null;
-        for(WalCheckpoint cp : slaveAckMap.values()){
-            if (minCheckpoint == null || cp.compareTo(minCheckpoint) < 0) {
-                minCheckpoint = cp;
+        LsnPosition minCheckpoint = null;
+        for(LsnPosition lsn : slaveAckLsn.values()){
+            if (minCheckpoint == null || lsn.compareTo(minCheckpoint) < 0) {
+                minCheckpoint = lsn;
             }
         }
-        return minCheckpoint;
+        return new WalCheckpoint(1, minCheckpoint.getSegmentIndex(), minCheckpoint.getOffset());
+
         
     }
 
+    @Override
+    public ConcurrentHashMap<String, LsnPosition> getSlaveAckMap() {
+        return slaveAckLsn;
+    }
 
+    @Override
+    public ReplicationAck applyReplication(ReplicationRequest req) throws  Exception {
+        //1.正常写入 本地wal+内存
+        readFromMaster(req.getUserId(), req.getMsgId());
 
+        //2. 记录主Lsn的进度+关键
+        LsnPosition masterLsn = new LsnPosition(req.getSegmentIndex(), req.getOffset());
+        replicationProgressStore.save(masterLsn);
+        ReplicationAck ack = new ReplicationAck();
+        ack.setAckSegmentIndex(masterLsn.getSegmentIndex());
+        ack.setAckOffset(masterLsn.getOffset());
+        ack.setSlaveUrl(replicationConfig.getSelfUrl());
+        log.info("✅ Replication applied, ack: {}", ack);
+        return ack;
+    }
 
 
 }

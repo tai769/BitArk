@@ -2,18 +2,18 @@ package com.bitark.commons.dto;
 
 
 
-import com.bitark.commons.wal.WalCheckpoint;
+import com.bitark.commons.lsn.LsnPosition;
 import lombok.Data;
 
 @Data
 public class ReplicationAck {
 
+    private String slaveUrl; // slave的唯一标识
     private int ackSegmentIndex;
     private long ackOffset;
-    
-    // 快捷方法：把回执转回 Checkpoint 对象方便 Master 比较
-    public WalCheckpoint toCheckpoint() {
-        return new WalCheckpoint(1, ackSegmentIndex, ackOffset); 
+
+    public LsnPosition toLsnPosition() {
+        return new LsnPosition(ackSegmentIndex, ackOffset); 
     }
 
 }

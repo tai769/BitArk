@@ -22,7 +22,9 @@ recovery:
   checkpoint-path: /home/qiushui/IdeaProjects/BitArk/wal/checkpoint.bin
 
 replication:
-  slave-url: ""
+  # slave-url: ""
+  # master 
+  self-url: http://localhost:8081
 
 
 # 日志配置
