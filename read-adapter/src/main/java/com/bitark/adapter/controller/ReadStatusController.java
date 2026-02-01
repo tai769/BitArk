@@ -2,7 +2,7 @@ package com.bitark.adapter.controller;
 
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
-import com.bitark.engine.service.ReadServiceImpl;
+import com.bitark.engine.service.facade.ReadServiceImpl;
 
 @RestController
 @RequestMapping("/read")

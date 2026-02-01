@@ -2,7 +2,7 @@ package com.bitark.adapter.config;
 
 import com.bitark.engine.wal.WalEngine;
 import com.bitark.engine.wal.WalEngines;
-import com.bitark.engine.config.WalConfig;
+import com.bitark.engine.wal.WalConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 

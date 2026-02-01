@@ -7,7 +7,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.bitark.engine.WalReader.WalReader_V1;
 import com.bitark.engine.WalWriter.WalWriter_V2;
-import com.bitark.engine.config.WalConfig;
+import com.bitark.engine.wal.WalConfig;
 import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.log.LogEntryHandler;
 import com.bitark.commons.wal.WalCheckpoint;

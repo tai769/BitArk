@@ -2,7 +2,7 @@ package com.bitark.engine.replication.reporter;
 
 import com.bitark.commons.dto.ReplicationAck;
 import com.bitark.commons.lsn.LsnPosition;
-import com.bitark.engine.config.ReplicationConfig;
+import com.bitark.engine.replication.config.ReplicationConfig;
 import org.springframework.web.client.RestTemplate;
 
 public class HttpReplicationReporter implements ReplicationReporter{
@@ -17,7 +17,7 @@ public class HttpReplicationReporter implements ReplicationReporter{
     @Override
     public void reportStartup(LsnPosition lsn) {
         String masterUrl = replicationConfig.getMasterUrl();
-        if (masterUrl == null && masterUrl.isBlank()) {
+        if (masterUrl == null || masterUrl.isBlank()) {
             return;
         }
         ReplicationAck ack = new ReplicationAck();

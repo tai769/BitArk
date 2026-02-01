@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.WalReader.WalReader_V1;
-import com.bitark.engine.config.WalConfig;
+import com.bitark.engine.wal.WalConfig;
 
 import java.io.File;
 import java.io.IOException;

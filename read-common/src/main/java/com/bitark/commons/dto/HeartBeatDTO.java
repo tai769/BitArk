@@ -1,11 +1,15 @@
 package com.bitark.commons.dto;
 
 import com.bitark.commons.lsn.LsnPosition;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class HeartBeatDTO {
-    private String slaveId; //selfUrl的唯一标记
+    private String slaveUrl; //selfUrl的唯一标记
 
     private LsnPosition lsnPosition; // 主lsn位置
 

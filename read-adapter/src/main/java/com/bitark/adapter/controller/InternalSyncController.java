@@ -1,7 +1,8 @@
 package com.bitark.adapter.controller;
 
-import com.bitark.engine.config.ReplicationConfig;
-import com.bitark.engine.replication.ReplicationService;
+import com.bitark.commons.dto.HeartBeatDTO;
+import com.bitark.engine.replication.master.MasterReplicationService;
+import com.bitark.engine.replication.slave.SlaveReplicationService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.bitark.commons.dto.ReplicationAck;
 import com.bitark.commons.dto.ReplicationRequest;
-import com.bitark.engine.service.ReadService;
 
 /*
 * 内部同步接口
@@ -24,26 +24,34 @@ import com.bitark.engine.service.ReadService;
 public class InternalSyncController {
 
     @Resource
-    private ReplicationService  replicationService;
+    private MasterReplicationService masterReplicationService;
+
+    @Resource
+    private SlaveReplicationService slaveReplicationService;
 
 
     @PostMapping("/sync")
     public ReplicationAck sync(@RequestBody ReplicationRequest req)throws Exception {
-        ReplicationAck ack = replicationService.sync( req);
-        return ack;
+        return slaveReplicationService.sync( req);
     }
 
     @PostMapping("/register")
     public String register(@RequestBody ReplicationAck ack){
-        replicationService.register(ack);
-         log.info("📢 Slave Registered: {} at {}", ack.getSlaveUrl(), ack.toLsnPosition());
-         return "ok";
+        return masterReplicationService.register(ack);
+
     }
 
     @PostMapping("/heartbeat")
     public String heartbeat(@RequestBody ReplicationAck ack){
 
         log.info("📢 Slave Heartbeat: {} at {}", ack.getSlaveUrl(), ack.toLsnPosition());
+        return "ok";
+    }
+
+
+    @PostMapping("/heartbeat")
+    public String heartbeat(@RequestBody HeartBeatDTO dto) {
+        masterReplicationService.onHeartbeat(dto);
         return "ok";
     }
 }
