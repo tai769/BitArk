@@ -4,7 +4,6 @@ import com.bitark.commons.dto.HeartBeatDTO;
 import com.bitark.commons.lsn.LsnPosition;
 import com.bitark.engine.replication.config.ReplicationConfig;
 import com.bitark.engine.replication.progress.ReplicationProgressStore;
-import com.bitark.infrastructure.thread.ThreadUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -40,9 +39,10 @@ public class SlaveHeartbeatScheduler {
         try{
             LsnPosition lsn = store.load();
             HeartBeatDTO dto = new HeartBeatDTO();
+            dto.setSlaveUrl(config.getSlaveUrl());
             dto.setLsnPosition(lsn);
             dto.setTimestampMs(System.currentTimeMillis());
-            restTemplate.postForObject(config.getMasterUrl(), dto, Void.class);
+            restTemplate.postForObject(config.getMasterUrl()+"/internal/heartbeat", dto, Void.class);
         }catch (Exception e){
             log.error("send heartbeat error", e);
         }

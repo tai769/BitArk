@@ -31,6 +31,9 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
         }
         LsnPosition minLsn = null;
         for (SlaveState slaveState : ackMap.values()){
+            if (System.currentTimeMillis() - slaveState.getLastHeartbeatMs() > heartBeatTimeOutMs ){
+                continue;
+            }
             if (minLsn == null || slaveState.getAckLsn().compareTo(minLsn) < 0){
                 minLsn = slaveState.getAckLsn();
             }
@@ -46,6 +49,9 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
         SlaveState slaveState = ackMap.computeIfAbsent(
                 slaveId, k -> new SlaveState(lsn, System.currentTimeMillis())
         );
+        // 更新从节点状态：更新确认的LSN和心跳时间
+        slaveState.setAckLsn(lsn);
+        slaveState.setLastHeartbeatMs(System.currentTimeMillis());
     }
 
 

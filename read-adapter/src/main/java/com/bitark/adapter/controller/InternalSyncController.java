@@ -41,12 +41,6 @@ public class InternalSyncController {
 
     }
 
-    @PostMapping("/heartbeat")
-    public String heartbeat(@RequestBody ReplicationAck ack){
-
-        log.info("📢 Slave Heartbeat: {} at {}", ack.getSlaveUrl(), ack.toLsnPosition());
-        return "ok";
-    }
 
 
     @PostMapping("/heartbeat")
