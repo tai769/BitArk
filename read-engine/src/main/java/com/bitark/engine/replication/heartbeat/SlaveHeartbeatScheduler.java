@@ -17,12 +17,14 @@ public class SlaveHeartbeatScheduler {
     private final ReplicationConfig config;
     private final ReplicationProgressStore store;
     private final RestTemplate restTemplate;
+    private final ScheduledExecutorService scheduler;
 
-    private ScheduledExecutorService scheduler;
-    public SlaveHeartbeatScheduler(ReplicationConfig config, ReplicationProgressStore store, RestTemplate restTemplate) {
+
+    public SlaveHeartbeatScheduler(ReplicationConfig config, ReplicationProgressStore store, RestTemplate restTemplate, ScheduledExecutorService scheduler) {
         this.config = config;
         this.store = store;
         this.restTemplate = restTemplate;
+        this.scheduler = scheduler;
     }
 
     @PostConstruct
@@ -30,7 +32,6 @@ public class SlaveHeartbeatScheduler {
         if (config.getMasterUrl() == null || config.getMasterUrl().isBlank()) {
             return; // 不是 slave，就不发心跳
         }
-        scheduler = ThreadUtils.newSingleThreadScheduledExecutor("Heart",false);
         scheduler.scheduleAtFixedRate(this::sendHeartbeat, 0, config.getHeartbeatIntervalMs(), TimeUnit.MILLISECONDS);
     }
 
@@ -48,10 +49,5 @@ public class SlaveHeartbeatScheduler {
         }
     }
 
-    @PreDestroy
-    public void destroy() {
-        if (scheduler != null) {
-            scheduler.shutdownNow();
-        }
-    }
+
 }

@@ -5,7 +5,7 @@ import com.bitark.commons.dto.ReplicationRequest;
 import com.bitark.commons.lsn.LsnPosition;
 import com.bitark.engine.replication.config.ReplicationConfig;
 import com.bitark.engine.service.command.ReadCommandService;
-import com.bitark.engine.service.facade.ReadService;
+
 
 public class SlaveReplicationServiceImpl implements SlaveReplicationService{
 
