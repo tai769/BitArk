@@ -9,4 +9,8 @@ import lombok.*;
 public class SlaveState {
     private final LsnPosition ackLsn;
     private final long lastHeartbeatMs;
+
+    private final ReplicaStatus status;
+    private final int healthyStreak;
+    private final boolean needsFullSync;
 }
