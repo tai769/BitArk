@@ -3,7 +3,9 @@ package com.bitark.engine.replication.tracker;
 import com.bitark.commons.dto.HeartBeatDTO;
 import com.bitark.commons.lsn.LsnPosition;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReplicationTrackerImpl implements ReplicationTracker {
 
@@ -21,7 +23,12 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
         if (slaveId == null || slaveId.isBlank() || lsn == null){
             return;
         }
-        ackMap.put(slaveId, new SlaveState(lsn, System.currentTimeMillis()));
+        ackMap.compute(slaveId, (key, existing) -> {
+            if (existing == null || lsn.compareTo(existing.getAckLsn()) > 0) {
+                return new SlaveState(lsn, System.currentTimeMillis());
+            }
+            return existing;
+        });
     }
 
     @Override
@@ -46,27 +53,24 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
         if (slaveId == null || slaveId.isBlank() || lsn == null){
             return;
         }
-        SlaveState slaveState = ackMap.computeIfAbsent(
-                slaveId, k -> new SlaveState(lsn, System.currentTimeMillis())
-        );
-        // 更新从节点状态：更新确认的LSN和心跳时间
-        slaveState.setAckLsn(lsn);
-        slaveState.setLastHeartbeatMs(System.currentTimeMillis());
+        ackMap.compute(slaveId, (id , old) -> {
+            return new SlaveState(lsn, System.currentTimeMillis());
+        });
     }
 
 
     @Override
     public int evictExpired() {
         long now = System.currentTimeMillis();
-        int removed = 0;
-        for (String slaveId : ackMap.keySet()) {
-            SlaveState slaveState = ackMap.get(slaveId);
-            if (now - slaveState.getLastHeartbeatMs() > heartBeatTimeOutMs) {
-                ackMap.remove(slaveId);
-                removed++;
+        AtomicInteger removed = new AtomicInteger(0);
+        for (Map.Entry<String, SlaveState> entry : ackMap.entrySet()){
+            SlaveState snapshot = entry.getValue();
+            if (now - snapshot.getLastHeartbeatMs() > heartBeatTimeOutMs){
+                if (ackMap.remove(entry.getKey(), snapshot)){
+                    removed.incrementAndGet();
+                }
             }
         }
-
-        return removed;
+        return removed.get();
     }
 }
