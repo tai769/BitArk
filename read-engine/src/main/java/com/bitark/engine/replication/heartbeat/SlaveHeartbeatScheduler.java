@@ -5,7 +5,6 @@ import com.bitark.commons.lsn.LsnPosition;
 import com.bitark.engine.replication.config.ReplicationConfig;
 import com.bitark.engine.replication.progress.ReplicationProgressStore;
 import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestTemplate;
 
@@ -40,7 +39,11 @@ public class SlaveHeartbeatScheduler {
         try{
             LsnPosition lsn = store.load();
             HeartBeatDTO dto = new HeartBeatDTO();
-            dto.setSlaveUrl(config.getSlaveUrl());
+            if (config.getSelfUrl() == null || config.getSelfUrl().isBlank()) {
+                log.warn("skip heartbeat: selfUrl is blank");
+                return;
+            }
+            dto.setSlaveUrl(config.getSelfUrl());
             dto.setLsnPosition(lsn);
             dto.setTimestampMs(System.currentTimeMillis());
             restTemplate.postForObject(config.getMasterUrl()+"/internal/heartbeat", dto, Void.class);

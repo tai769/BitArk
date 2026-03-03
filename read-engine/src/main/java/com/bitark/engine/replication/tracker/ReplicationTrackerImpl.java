@@ -25,7 +25,7 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
         }
         ackMap.compute(slaveId, (key, existing) -> {
             if (existing == null || lsn.compareTo(existing.getAckLsn()) > 0) {
-                return new SlaveState(lsn, System.currentTimeMillis());
+                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.ISR, 0, false);
             }
             return existing;
         });
@@ -54,7 +54,7 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
             return;
         }
         ackMap.compute(slaveId, (id , old) -> {
-            return new SlaveState(lsn, System.currentTimeMillis());
+            return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.ISR, old == null ? 0 : old.getHealthyStreak() + 1, false);
         });
     }
 
