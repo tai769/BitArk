@@ -1,6 +1,6 @@
 package com.bitark.engine.replication.tracker;
 
-import com.bitark.commons.dto.HeartBeatDTO;
+
 import com.bitark.commons.lsn.LsnPosition;
 
 import java.util.Map;
@@ -19,13 +19,13 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
     }
 
     @Override
-    public void registerAck(String slaveId, LsnPosition lsn) {
+    public void registerAck(String slaveId, LsnPosition lsn, boolean needsFullSync) {
         if (slaveId == null || slaveId.isBlank() || lsn == null){
             return;
         }
         ackMap.compute(slaveId, (key, existing) -> {
             if (existing == null || lsn.compareTo(existing.getAckLsn()) > 0) {
-                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.ISR, 0, false);
+                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.OBSERVER , 0, needsFullSync);
             }
             return existing;
         });
@@ -48,13 +48,20 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
         return minLsn;
     }
 
+
     @Override
     public void onHeartbeat(String slaveId, LsnPosition lsn) {
         if (slaveId == null || slaveId.isBlank() || lsn == null){
             return;
         }
         ackMap.compute(slaveId, (id , old) -> {
-            return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.ISR, old == null ? 0 : old.getHealthyStreak() + 1, false);
+            if (old == null){
+                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.OBSERVER, 0, true);
+            }
+
+            return new SlaveState(lsn, System.currentTimeMillis(), old.getStatus(), old.getHealthyStreak(), old.isNeedsFullSync());
+
+
         });
     }
 
