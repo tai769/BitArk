@@ -16,21 +16,21 @@ public class MasterLivenessMonitor {
     private final ReplicationConfig config;
     private final ScheduledExecutorService livenessScheduler;
 
-    public MasterLivenessMonitor(ReplicationTracker tracker, ReplicationConfig config,ScheduledExecutorService livenessScheduler ) {
+    public MasterLivenessMonitor(ReplicationTracker tracker, ReplicationConfig config,
+            ScheduledExecutorService livenessScheduler) {
         this.tracker = tracker;
         this.livenessScheduler = livenessScheduler;
         this.config = config;
     }
 
     @PostConstruct
-    public void start(){
+    public void start() {
         livenessScheduler.scheduleAtFixedRate(() -> {
             int removed = tracker.evictExpired();
-            if (removed > 0){
+            if (removed > 0) {
                 log.info("evict dead slaves: {}", removed);
             }
-        }, config.getHeartbeatIntervalMs(), config.getHeartbeatIntervalMs(), TimeUnit.MILLISECONDS);
+        }, config.getHeartbeatTimeoutMs(), config.getHeartbeatTimeoutMs(), TimeUnit.MILLISECONDS);
     }
-
 
 }
