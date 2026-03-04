@@ -23,7 +23,8 @@ recovery:
 
 replication:
   # slave-url: ""
-  # master 
+  # master
+  master-url: http://localhost:8080
   self-url: http://localhost:8081
 
 
