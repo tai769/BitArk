@@ -12,5 +12,7 @@ public class SlaveState {
 
     private final ReplicaStatus status;
 
+    private final Integer healthyStreak;
+
     private final boolean needsFullSync;
 }

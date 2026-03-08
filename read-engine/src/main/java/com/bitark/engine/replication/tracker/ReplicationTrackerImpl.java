@@ -30,7 +30,7 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
         }
         ackMap.compute(slaveId, (key, existing) -> {
             if (existing == null || lsn.compareTo(existing.getAckLsn()) > 0) {
-                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.OBSERVER, true);
+                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.OBSERVER, 0,false);
             }
             return existing;
         });
@@ -57,19 +57,26 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
     @Override
     public void onHeartbeat(String slaveId, LsnPosition lsn) {
         if (slaveId == null || slaveId.isBlank() || lsn == null) {
+            log.error("Invalid heartbeat: slaveId: {}, lsn: {}", slaveId, lsn);
             return;
         }
+        long segmentOffset = walCheckpointSupplier.get().getSegmentOffset();
         ackMap.compute(slaveId, (id, old) -> {
             if (old == null) {
                 log.error("Slave not registered: {}", slaveId);
                 return null;
             }
-            if (walCheckpointSupplier.get().getSegmentOffset() - lsn.getOffset() > Lag) {
-                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.OUT_OF_SYNC, true);
-            } else {
-                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.ISR, false);
-            }
+            if (segmentOffset - lsn.getOffset() > Lag) {
 
+                return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.OUT_OF_SYNC, 0, false);
+            } else {
+                if (old.getStatus() != ReplicaStatus.ISR && old.getHealthyStreak()+1 < 3) {
+
+                        return new SlaveState(lsn, System.currentTimeMillis(), old.getStatus(), old.getHealthyStreak() + 1, false);
+                } else {
+                    return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.ISR, old.getHealthyStreak() + 1, false);
+                }
+            }
         });
     }
 
