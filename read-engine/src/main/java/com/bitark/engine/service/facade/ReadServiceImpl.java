@@ -12,8 +12,6 @@ import com.bitark.engine.wal.WalEngine;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import com.bitark.engine.recover.RecoveryCoordinator;
-import com.bitark.commons.dto.ReplicationRequest;
-import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.wal.WalCheckpoint;
 
 
@@ -29,6 +27,8 @@ public class ReadServiceImpl implements ReadService {
     private final ReplicationBootstrapper bootstrapper;
     private final ReplicationTracker tracker;
     private final WalEngine walEngine;
+
+    private int consecutiveGcSkip = 0;
 
     public ReadServiceImpl(ReadCommandService commandService,
                            ReadQueryService queryService,
@@ -74,11 +74,19 @@ public class ReadServiceImpl implements ReadService {
 
     @Override
     public void snapshot() throws Exception {
-        WalCheckpoint masterCheckpoint = recoveryCoordinator.snapshot(engine);
-        LsnPosition minLsn = tracker.getMinAckLsn();
-        WalCheckpoint safeCheckpoint = (minLsn == null)
-                ? masterCheckpoint
-                : new WalCheckpoint(1, minLsn.getSegmentIndex(), minLsn.getOffset());
+
+        recoveryCoordinator.snapshot(engine);
+        LsnPosition minLsn = tracker.getMinIsrAckLsn();
+        if (minLsn == null){
+            consecutiveGcSkip++;
+            if (consecutiveGcSkip % 10 == 0){
+                log.warn("No slave ack lsn found, skipping gc");
+            }
+
+            return;
+        }
+        consecutiveGcSkip = 0;
+        WalCheckpoint safeCheckpoint = new WalCheckpoint(1, minLsn.getSegmentIndex(), minLsn.getOffset());
         walEngine.gcOldSegment(safeCheckpoint);
 
     }

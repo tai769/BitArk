@@ -12,15 +12,21 @@ import java.util.function.Supplier;
 @Slf4j
 public class ReplicationTrackerImpl implements ReplicationTracker {
 
-    private final Long heartBeatTimeOutMs;
+    private final long heartBeatTimeOutMs;
     private final ConcurrentHashMap<String, SlaveState> ackMap = new ConcurrentHashMap<>();
     private final Supplier<WalCheckpoint> walCheckpointSupplier;
 
-    private final int Lag = 100;
 
-    public ReplicationTrackerImpl(Long heartBeatTimeOutMs, Supplier<WalCheckpoint> walCheckpointSupplier) {
+
+    private long lag;
+    private int isrJoinStreak;
+
+    public ReplicationTrackerImpl(long heartBeatTimeOutMs, Supplier<WalCheckpoint> walCheckpointSupplier
+        , long lag, int isrHealthyStreak) {
         this.heartBeatTimeOutMs = heartBeatTimeOutMs;
         this.walCheckpointSupplier = walCheckpointSupplier;
+        this.lag = lag;
+        this.isrJoinStreak = isrHealthyStreak;
     }
 
     @Override
@@ -37,14 +43,14 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
     }
 
     @Override
-    public LsnPosition getMinAckLsn() {
+    public LsnPosition getMinIsrAckLsn() {
+        evictExpired();  // 堵住窗口：先清理超时节点
         if (ackMap.isEmpty()) {
             return null;
         }
         LsnPosition minLsn = null;
         for (SlaveState slaveState : ackMap.values()) {
-            if (System.currentTimeMillis() - slaveState.getLastHeartbeatMs() > heartBeatTimeOutMs
-                    || !slaveState.getStatus().equals(ReplicaStatus.ISR)) {
+            if (!slaveState.getStatus().equals(ReplicaStatus.ISR)) {
                 continue;
             }
             if (minLsn == null || slaveState.getAckLsn().compareTo(minLsn) < 0) {
@@ -66,11 +72,11 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
                 log.error("Slave not registered: {}", slaveId);
                 return null;
             }
-            if (segmentOffset - lsn.getOffset() > Lag) {
+            if (segmentOffset - lsn.getOffset() > lag) {
 
                 return new SlaveState(lsn, System.currentTimeMillis(), ReplicaStatus.OUT_OF_SYNC, 0, false);
             } else {
-                if (old.getStatus() != ReplicaStatus.ISR && old.getHealthyStreak()+1 < 3) {
+                if (old.getStatus() != ReplicaStatus.ISR && old.getHealthyStreak()+1 < isrJoinStreak) {
 
                         return new SlaveState(lsn, System.currentTimeMillis(), old.getStatus(), old.getHealthyStreak() + 1, false);
                 } else {
@@ -83,15 +89,15 @@ public class ReplicationTrackerImpl implements ReplicationTracker {
     @Override
     public int evictExpired() {
         long now = System.currentTimeMillis();
-        AtomicInteger removed = new AtomicInteger(0);
+        int removed = 0;
         for (Map.Entry<String, SlaveState> entry : ackMap.entrySet()) {
             SlaveState snapshot = entry.getValue();
             if (now - snapshot.getLastHeartbeatMs() > heartBeatTimeOutMs) {
                 if (ackMap.remove(entry.getKey(), snapshot)) {
-                    removed.incrementAndGet();
+                    removed++;
                 }
             }
         }
-        return removed.get();
+        return removed;
     }
 }

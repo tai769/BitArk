@@ -10,12 +10,12 @@ public class ReplicationTrackerConfig {
 
     @Bean
     public ReplicationTracker replicationTracker(ReplicationConfig config, WalEngine walEngine) {
-        return new ReplicationTrackerImpl( config.getHeartbeatTimeoutMs(), () -> {
+        return new ReplicationTrackerImpl(config.getHeartbeatTimeoutMs(), () -> {
             try {
                 return walEngine.currCheckpoint();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        });
+        }, config.getMaxLagBytes(), config.getIsrJoinStreak());
     }
 }

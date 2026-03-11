@@ -12,6 +12,12 @@ public class ReplicationConfig {
     // 默认值设为本地，防止 yml 漏写报错
     private String slaveUrl = "http://127.0.0.1:8081/internal/sync";
 
+
+    private long maxLagBytes = 100;
+
+    // ISR 进入需要的连续健康次数
+    private int isrJoinStreak = 3;
+
     private String masterUrl; //老师的地址
 
     private String selfUrl; //自己的地址
