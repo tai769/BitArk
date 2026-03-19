@@ -1,7 +1,6 @@
 package com.bitark.engine.replication.heartbeat;
 
 import com.bitark.commons.dto.HeartBeatDTO;
-import com.bitark.commons.lsn.LsnPosition;
 import com.bitark.engine.replication.config.ReplicationConfig;
 import com.bitark.engine.replication.progress.ReplicationProgressStore;
 import jakarta.annotation.PostConstruct;
@@ -37,14 +36,14 @@ public class SlaveHeartbeatScheduler {
     private void sendHeartbeat() {
 
         try{
-            LsnPosition lsn = store.load();
+            Long globalLsn = store.load();
             HeartBeatDTO dto = new HeartBeatDTO();
             if (config.getSelfUrl() == null || config.getSelfUrl().isBlank()) {
                 log.warn("skip heartbeat: selfUrl is blank");
                 return;
             }
             dto.setSlaveUrl(config.getSelfUrl());
-            dto.setLsnPosition(lsn);
+            dto.setGlobalLsn(globalLsn);
             dto.setTimestampMs(System.currentTimeMillis());
             restTemplate.postForObject(config.getMasterUrl()+"/internal/heartbeat", dto, Void.class);
         }catch (Exception e){

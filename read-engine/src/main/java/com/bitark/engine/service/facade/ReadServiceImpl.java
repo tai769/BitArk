@@ -1,6 +1,5 @@
 package com.bitark.engine.service.facade;
 
-import com.bitark.commons.lsn.LsnPosition;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.replication.progress.ReplicationProgressStore;
 import com.bitark.engine.replication.tracker.ReplicationTracker;
@@ -72,12 +71,13 @@ public class ReadServiceImpl implements ReadService {
         commandService.readFromMaster(userId, msgId);
     }
 
+
     @Override
     public void snapshot() throws Exception {
 
         recoveryCoordinator.snapshot(engine);
-        LsnPosition minLsn = tracker.getMinIsrAckLsn();
-        if (minLsn == null){
+        Long minGlobalLsn = tracker.getMinIsrAckLsn();
+        if (minGlobalLsn == null){
             consecutiveGcSkip++;
             if (consecutiveGcSkip % 10 == 0){
                 log.warn("No slave ack lsn found, skipping gc");
@@ -86,7 +86,7 @@ public class ReadServiceImpl implements ReadService {
             return;
         }
         consecutiveGcSkip = 0;
-        WalCheckpoint safeCheckpoint = new WalCheckpoint(1, minLsn.getSegmentIndex(), minLsn.getOffset());
+        WalCheckpoint safeCheckpoint = walEngine.toCheckpoint(minGlobalLsn);
         walEngine.gcOldSegment(safeCheckpoint);
 
     }

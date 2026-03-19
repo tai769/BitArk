@@ -1,12 +1,9 @@
 package com.bitark.engine.replication.tracker;
 
-import com.bitark.commons.dto.HeartBeatDTO;
-import com.bitark.commons.lsn.LsnPosition;
-
 public interface ReplicationTracker {
-    void registerAck(String slaveId, LsnPosition lsn );
-    LsnPosition getMinIsrAckLsn();
+    void registerAck(String slaveId, Long globalLsn );
+    Long getMinIsrAckLsn();
 
-    void onHeartbeat(String slaveId, LsnPosition lsn);
+    void onHeartbeat(String slaveId, Long globalLsn);
     int evictExpired();
 }

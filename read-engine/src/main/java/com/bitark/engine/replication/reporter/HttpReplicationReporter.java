@@ -1,7 +1,6 @@
 package com.bitark.engine.replication.reporter;
 
 import com.bitark.commons.dto.ReplicationAck;
-import com.bitark.commons.lsn.LsnPosition;
 import com.bitark.engine.replication.config.ReplicationConfig;
 import org.springframework.web.client.RestTemplate;
 
@@ -15,15 +14,14 @@ public class HttpReplicationReporter implements ReplicationReporter{
         this.replicationConfig = replicationConfig;
     }
     @Override
-    public void reportStartup(LsnPosition lsn) {
+    public void reportStartup(Long globalLsn) {
         String masterUrl = replicationConfig.getMasterUrl();
         if (masterUrl == null || masterUrl.isBlank()) {
             return;
         }
         ReplicationAck ack = new ReplicationAck();
         ack.setSlaveUrl(replicationConfig.getSelfUrl());
-        ack.setAckSegmentIndex(lsn.getSegmentIndex());
-        ack.setAckOffset(lsn.getOffset());
+        ack.setGlobalLsn(globalLsn);
         restTemplate.postForObject(masterUrl + "/internal/register", ack, String.class);
     }
 }

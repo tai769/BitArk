@@ -1,7 +1,6 @@
 package com.bitark.engine.service.facade;
 
 import com.bitark.commons.dto.ReplicationRequest;
-import com.bitark.commons.lsn.LsnPosition;
 
 public interface ReadService {
     void read(Long userId, Long msgId) throws Exception;

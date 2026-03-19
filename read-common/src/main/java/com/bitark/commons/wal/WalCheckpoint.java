@@ -4,12 +4,10 @@ import lombok.Data;
 
 @Data
 public class WalCheckpoint {
-    int version;
     int segmentIndex;
     long segmentOffset; 
 
-    public WalCheckpoint(int version, int segmentIndex, long segmentOffset) {
-        this.version = version;
+    public WalCheckpoint(int segmentIndex, long segmentOffset) {
         this.segmentIndex = segmentIndex;
         this.segmentOffset = segmentOffset;
     }

@@ -24,6 +24,10 @@ recovery:
 replication:
   slave-url: http://127.0.0.1:8081/internal/sync
   progress-path: /home/qiushui/IdeaProjects/BitArk/wal/slave-progress.bin
+  master-url: http://localhost:8080
+  self-url: http://localhost:8081
+  max-lag-bytes: 100
+  isr-join-streak: 3
 
 # 日志配置
 logging:

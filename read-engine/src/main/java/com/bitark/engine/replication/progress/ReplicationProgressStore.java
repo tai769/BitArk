@@ -1,6 +1,6 @@
 package com.bitark.engine.replication.progress;
 
-import com.bitark.commons.lsn.LsnPosition;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 
-
+@Slf4j
 public class ReplicationProgressStore {
 
     private static final int VERSION = 1;
@@ -20,26 +20,25 @@ public class ReplicationProgressStore {
 
 
 
-    public void save(LsnPosition lsn)throws IOException{
+    public void save(Long globalLsn)throws IOException{
         if (path.getParent() != null){
             Files.createDirectories(path.getParent());
         }
         try(DataOutputStream out = new DataOutputStream(Files.newOutputStream(path))){
             out.writeInt(VERSION);
-            out.writeInt(lsn.getSegmentIndex());
-            out.writeLong(lsn.getOffset());
+            out.writeLong(globalLsn);
         }
     }
 
-    public LsnPosition load() throws IOException{
+    public Long load() throws IOException{
         if (!Files.exists(path)){
+            log.error("No replication progress file found at {}", path);
             return null;
         }
         try(DataInputStream in = new DataInputStream(Files.newInputStream(path))){
             int version = in.readInt();
-            int seg = in.readInt();
-            Long off = in.readLong();
-            return new LsnPosition(seg, off);
+            Long lsn = in.readLong();
+           return lsn;
         }
     }
 }

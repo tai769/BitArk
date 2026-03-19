@@ -159,14 +159,14 @@ public class WalWriter_V2 implements AutoCloseable {
     /*
      * 优化点2 ： 返回Future, 支持强一致性等待
      */
-    public CompletableFuture<WalCheckpoint> append(LogEntry entry) {
+    public CompletableFuture<Long> append(LogEntry entry) {
         if (!running.get()) {
             throw new IllegalStateException("WalWriter is closed");
         }
         WriteRequest req = new WriteRequest(entry);
         if (!queue.offer(req)) {
             // 队列满
-            CompletableFuture<WalCheckpoint> fail = new CompletableFuture<>();
+            CompletableFuture<Long> fail = new CompletableFuture<>();
             fail.completeExceptionally(new RuntimeException("WalWriter queue is full"));
             return fail; // Changed from return fail.completedFuture(true);
         }
@@ -198,7 +198,8 @@ public class WalWriter_V2 implements AutoCloseable {
 
                     // 在数据塞进buffer之前,记录位置
                     Long lsnOffset = writeBuffer.position() + fileChannel.position();
-                    req.assignedLsn = new WalCheckpoint(1, currentIndex, lsnOffset);
+                    Long globalStart = currentIndex*maxFileSizeBytes + lsnOffset;
+                    req.assignedLsn = globalStart + LogEntry.ENTRY_SIZE;
                     req.entry.encode(writeBuffer);
                 }
                 flush();
@@ -270,15 +271,15 @@ public class WalWriter_V2 implements AutoCloseable {
 
     public WalCheckpoint currentCheckpoint()throws IOException {
         long pos = fileChannel.position();
-        return new WalCheckpoint(1, currentIndex, pos);
+        return new WalCheckpoint(currentIndex, pos);
     }
 
 
     @Data
     private static class WriteRequest {
         final LogEntry entry;
-        final CompletableFuture<WalCheckpoint> futrue;
-        WalCheckpoint assignedLsn;
+        final CompletableFuture<Long> futrue;
+        Long assignedLsn;
         WriteRequest(LogEntry entry) {
             this.entry = entry;
             this.futrue = new CompletableFuture<>();

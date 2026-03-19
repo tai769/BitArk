@@ -8,7 +8,7 @@ import com.bitark.commons.wal.WalCheckpoint;
 
 public interface WalEngine {
 
-    WalCheckpoint append(LogEntry entry);
+    Long append(LogEntry entry);
 
     Long replay(LogEntryHandler handler) throws Exception;
 
@@ -20,5 +20,7 @@ public interface WalEngine {
 
 
     void gcOldSegment(WalCheckpoint checkpoint) throws Exception;
+
+    WalCheckpoint toCheckpoint(Long lsn) throws Exception;
 
 }

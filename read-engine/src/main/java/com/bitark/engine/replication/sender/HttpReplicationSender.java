@@ -2,8 +2,6 @@ package com.bitark.engine.replication.sender;
 
 import com.bitark.commons.dto.ReplicationAck;
 import com.bitark.commons.dto.ReplicationRequest;
-import com.bitark.commons.lsn.LsnPosition;
-import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.replication.config.ReplicationConfig;
 import com.bitark.engine.replication.tracker.ReplicationTracker;
 import lombok.extern.slf4j.Slf4j;
@@ -28,20 +26,19 @@ public class HttpReplicationSender implements ReplicationSender{
     }
 
     @Override
-    public void sendRead(Long userId, Long msgId, WalCheckpoint lsn) {
+    public void sendRead(Long userId, Long msgId, Long lsn) {
         executorService.submit( () -> {
             try{
                 ReplicationRequest request = new ReplicationRequest();
                 request.setUserId(userId);
                 request.setMsgId(msgId);
-                request.setSegmentIndex(lsn.getSegmentIndex());
-                request.setOffset(lsn.getSegmentOffset());
+                request.setGlobalLsn(lsn);
 
                 ReplicationAck ack = restTemplate.postForObject(
                         replicationConfig.getSlaveUrl(), request, ReplicationAck.class);
                 if (ack != null && ack.getSlaveUrl() != null && !ack.getSlaveUrl().isBlank()){
-                    replicationTracker.registerAck(ack.getSlaveUrl(), new LsnPosition(ack.getAckSegmentIndex(), ack.getAckOffset()));
-                    log.info("Replication ack received from {} for {}", ack.getSlaveUrl(), ack.getAckSegmentIndex());
+                    replicationTracker.registerAck(ack.getSlaveUrl(), ack.getGlobalLsn());
+                    log.info("Replication ack received from {} for {}", ack.getSlaveUrl(), ack.getGlobalLsn());
                 }
             }catch (Exception e){
                 log.error("Replication error", e);

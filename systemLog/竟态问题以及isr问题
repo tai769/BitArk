@@ -1,0 +1,10 @@
+
+1. 原来的evictExpired在遍历ConncurrentHashMap的时候,是先get在remove.这两个步骤不是原子的,因为两步之间可能更了entrey,但其实心跳刚put了一个新的SLaveState.所以会导致误删除.
+我们的remove的条件删除,只有当map中的对象是同一个引用才删除.配和slaveState不可变,每次心跳创建对象.如果不修改,竟态问题会导致剔除掉运行正常的节点,导致gc水位线可能会升高,正常节点卡死.
+为什么不可变是因为条件删除比较的是引用.引用没变,条件删除就永远成立
+
+2. 在心跳检测中,Tracker需要获取master当前的写入位置来计算lag,但是Tracker和WalWriter是两条完全不相关的业务线,Tracker管节点状态,WalWriter管日志写盘,概念上没有从属关系.如果直接注入WalWriter,
+Tracker就会变的耦合.我们是用函数式接口来做的Tracker构造的时候接受一个Supplier,
+内部调用get就可以拿到Master的checkPonit, 上层组装的时候,用lambda表达式把两条线连接起来.两者互不相见. 
+如果用传参的话,调用放是slave.他不应该关心master的位置.而且缺少测试效益.
+这里为什么要引入isr呢,是因为onbeart只是心跳,但他无法确保这个节点其他功能比如日志写入是否正常,所以我们引用了isr.上报的lck日志在范围内就正常.

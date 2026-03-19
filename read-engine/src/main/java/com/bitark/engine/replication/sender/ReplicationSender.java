@@ -6,5 +6,5 @@ import com.bitark.commons.wal.WalCheckpoint;
 
 public interface ReplicationSender {
 
-    void sendRead(Long userId, Long msgId, WalCheckpoint lsn);
+    void sendRead(Long userId, Long msgId, Long lsn);
 }

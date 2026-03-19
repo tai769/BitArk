@@ -17,8 +17,8 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
 
     @Override
     public String register(ReplicationAck ack) {
-        tracker.registerAck(ack.getSlaveUrl(), ack.toLsnPosition());
-        log.info("📢 Slave Registered: {} at {}", ack.getSlaveUrl(), ack.toLsnPosition());
+        tracker.registerAck(ack.getSlaveUrl(), ack.getGlobalLsn());
+        log.info("📢 Slave Registered: {} at {}", ack.getSlaveUrl(), ack.getGlobalLsn());
         return "ok";
     }
 
@@ -27,6 +27,6 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
         if (dto == null || dto.getSlaveUrl() == null){
             return;
         }
-        tracker.onHeartbeat(dto.getSlaveUrl(), dto.getLsnPosition());
+        tracker.onHeartbeat(dto.getSlaveUrl(), dto.getGlobalLsn());
     }
 }

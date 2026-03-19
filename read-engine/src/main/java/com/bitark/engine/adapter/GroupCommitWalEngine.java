@@ -31,11 +31,11 @@ public class GroupCommitWalEngine  implements WalEngine{
     }
 
     @Override
-    public WalCheckpoint append(LogEntry entry) {
+    public Long append(LogEntry entry) {
         try{
-            //1. 调用底层的append 
-            CompletableFuture<WalCheckpoint> 
-            future = writer.append(entry);
+            //1. 调用底层的appenWalCheckpointd
+            CompletableFuture<Long>
+                    future = writer.append(entry);
 
             //2. 关键调用.join同步等待磁盘写入返回lsn
             return future.join();
@@ -133,6 +133,12 @@ public class GroupCommitWalEngine  implements WalEngine{
             }
         }
         log.info("✅ GC completed. Deleted {} old segment(s)", deletedCount);
+    }
+
+    @Override
+    public WalCheckpoint toCheckpoint(Long globalLsn) throws Exception {
+
+        return new WalCheckpoint((int) (globalLsn/ config.getMaxFileSizeBytes()), globalLsn% config.getMaxFileSizeBytes());
     }
 
     private File[] listAndSortSegments(){
