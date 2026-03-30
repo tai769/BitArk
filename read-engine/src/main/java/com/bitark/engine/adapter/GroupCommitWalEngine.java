@@ -23,11 +23,13 @@ public class GroupCommitWalEngine  implements WalEngine{
     private final WalWriter_V2 writer;
     private final WalReader_V1 reader;
     private final WalConfig config;
+    private volatile long earliestRetainedLsn;
 
     public GroupCommitWalEngine(WalConfig config) throws IOException {
         this.config = config;
         this.writer = WalWriter_V2.init(config);
         this.reader = new WalReader_V1();
+        this.earliestRetainedLsn = calcEarliestRetainedLsn();
     }
 
     @Override
@@ -133,12 +135,18 @@ public class GroupCommitWalEngine  implements WalEngine{
             }
         }
         log.info("✅ GC completed. Deleted {} old segment(s)", deletedCount);
+        earliestRetainedLsn = calcEarliestRetainedLsn();
     }
 
     @Override
     public WalCheckpoint toCheckpoint(Long globalLsn) throws Exception {
 
         return new WalCheckpoint((int) (globalLsn/ config.getMaxFileSizeBytes()), globalLsn% config.getMaxFileSizeBytes());
+    }
+
+    @Override
+    public long earliestRetainedLsn() {
+        return earliestRetainedLsn;
     }
 
     private File[] listAndSortSegments(){
@@ -158,5 +166,14 @@ public class GroupCommitWalEngine  implements WalEngine{
         });
 
         return files;
+    }
+
+    private long calcEarliestRetainedLsn() {
+        File[] files = listAndSortSegments();
+        if (files.length == 0) {
+            return 0L;
+        }
+        int minIndex = parseIndex(files[0].getName(), config.getWalFileName());
+        return minIndex * config.getMaxFileSizeBytes();
     }
 }

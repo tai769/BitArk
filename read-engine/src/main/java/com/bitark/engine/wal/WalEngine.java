@@ -23,4 +23,6 @@ public interface WalEngine {
 
     WalCheckpoint toCheckpoint(Long lsn) throws Exception;
 
+    long earliestRetainedLsn();
+
 }
