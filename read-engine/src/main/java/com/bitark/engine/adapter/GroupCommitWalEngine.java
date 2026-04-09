@@ -149,6 +149,11 @@ public class GroupCommitWalEngine  implements WalEngine{
         return earliestRetainedLsn;
     }
 
+    @Override
+    public WalReadBatch readBatch(Long fromLsn, Integer maxBytes) throws Exception {
+        return null;
+    }
+
     private File[] listAndSortSegments(){
         String walDir = config.getWalDir();
         String baseName = config.getWalFileName();

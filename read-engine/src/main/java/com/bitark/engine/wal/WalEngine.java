@@ -3,7 +3,7 @@ package com.bitark.engine.wal;
 import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.log.LogEntryHandler;
 import com.bitark.commons.wal.WalCheckpoint;
-
+import com.bitark.engine.adapter.WalReadBatch;
 
 
 public interface WalEngine {
@@ -24,5 +24,7 @@ public interface WalEngine {
     WalCheckpoint toCheckpoint(Long lsn) throws Exception;
 
     long earliestRetainedLsn();
+
+    WalReadBatch readBatch(Long fromLsn, Integer maxBytes) throws Exception;
 
 }

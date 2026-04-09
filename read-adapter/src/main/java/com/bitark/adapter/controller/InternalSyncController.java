@@ -1,6 +1,6 @@
 package com.bitark.adapter.controller;
 
-import com.bitark.commons.dto.HeartBeatDTO;
+import com.bitark.commons.dto.*;
 import com.bitark.engine.replication.master.MasterReplicationService;
 import com.bitark.engine.replication.slave.SlaveReplicationService;
 import jakarta.annotation.Resource;
@@ -10,9 +10,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.bitark.commons.dto.ReplicationAck;
-import com.bitark.commons.dto.ReplicationRequest;
 
 /*
 * 内部同步接口
@@ -41,6 +38,10 @@ public class InternalSyncController {
 
     }
 
+    @PostMapping("/fetch")
+    public FetchResponse fetch(@RequestBody FetchRequest req){
+        return  masterReplicationService.fetch(req);
+    }
 
 
     @PostMapping("/heartbeat")
