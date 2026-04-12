@@ -2,9 +2,12 @@ package com.bitark.engine.adapter;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import com.bitark.engine.WalReader.FileReadBatch;
 import com.bitark.engine.WalReader.WalReader_V1;
 import com.bitark.engine.WalWriter.WalWriter_V2;
 import com.bitark.engine.wal.WalConfig;
@@ -138,6 +141,11 @@ public class GroupCommitWalEngine  implements WalEngine{
         earliestRetainedLsn = calcEarliestRetainedLsn();
     }
 
+    /**
+     * 转换全局LSN为WalCheckpoint
+     * @param globalLsn
+     * @return
+     */
     @Override
     public WalCheckpoint toCheckpoint(Long globalLsn) throws Exception {
 
@@ -151,7 +159,52 @@ public class GroupCommitWalEngine  implements WalEngine{
 
     @Override
     public WalReadBatch readBatch(Long fromLsn, Integer maxBytes) throws Exception {
-        return null;
+        //1. 把全局LSN变成checkPont
+        WalCheckpoint start = toCheckpoint(fromLsn);
+        String baseName = config.getWalFileName();
+        List<LogEntry> allEntries = new ArrayList<>();
+        int finalSegmentIndex = start.getSegmentIndex();
+        long finalOffset = start.getSegmentOffset();
+        int totalBytes = 0;
+        //2. 拿到所有的segment文件
+        File[] files = listAndSortSegments();
+        if (files.length == 0) {
+            return new WalReadBatch(new ArrayList<>(), fromLsn);
+        }
+        for (File f : files){
+            int idx = parseIndex(f.getName(), baseName);
+            if ( idx < finalSegmentIndex){
+                continue;
+            }
+
+            // 决定当前文件从哪里读
+            long startOffset;
+            if (idx == finalSegmentIndex){
+                startOffset = finalOffset;
+            }else {
+                startOffset = 0L;
+            }
+            int remainBytes = maxBytes - totalBytes;
+            if (remainBytes < LogEntry.ENTRY_SIZE){
+                break;
+            }
+            FileReadBatch fileBatch = reader.readBatch(f.getAbsolutePath(), startOffset, remainBytes);
+            // 计算这次还能读多少字节
+            allEntries.addAll(fileBatch.getEntries());
+            totalBytes += fileBatch.getEntries().size()*LogEntry.ENTRY_SIZE;
+            finalSegmentIndex = idx;
+            finalOffset = fileBatch.getNextOffset();
+
+            if (totalBytes >= maxBytes){
+                break;
+            }
+            if (!fileBatch.isReachFileEnd()){
+                break;
+            }
+
+        }
+        long nextLsn = finalSegmentIndex*config.getMaxFileSizeBytes() + finalOffset;
+        return new WalReadBatch(allEntries, nextLsn);
     }
 
     private File[] listAndSortSegments(){

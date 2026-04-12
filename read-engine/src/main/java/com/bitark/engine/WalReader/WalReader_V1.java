@@ -1,13 +1,18 @@
 package com.bitark.engine.WalReader;
 
+import lombok.extern.java.Log;
 import lombok.extern.slf4j.Slf4j;
 import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.log.LogEntryHandler;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 public class WalReader_V1 implements AutoCloseable{
@@ -94,11 +99,48 @@ public class WalReader_V1 implements AutoCloseable{
         while (buffer.hasRemaining()){
             int n = channel.read(buffer);
             if (n == -1){
-                return (totalRead == 0) ? 0 : totalRead;
+                return (totalRead == 0) ? -1 : totalRead;
             }
             totalRead += n;
         }
         return totalRead;
+    }
+
+
+    public FileReadBatch readBatch(String path, long startOffset, int maxBytes)throws Exception{
+        File file = new File(path);
+        if(!file.exists()){
+            throw  new FileNotFoundException("Wal Segment not exist " + path);
+        }
+        List<LogEntry> entries = new ArrayList<>();
+        int totalBytes = 0;
+        try(RandomAccessFile raf = new RandomAccessFile(path,"r");
+            FileChannel channel = raf.getChannel()){
+            channel.position(startOffset);
+            ByteBuffer buffer = ByteBuffer.allocate(LogEntry.ENTRY_SIZE);
+            while (totalBytes + LogEntry.ENTRY_SIZE <= maxBytes){
+                long entryOffset = channel.position();
+                buffer.clear();
+                int bytesRead = readFull(channel, buffer);
+                if (bytesRead == -1){
+                    return new FileReadBatch(entries, entryOffset,true);
+                }
+                if(bytesRead < LogEntry.ENTRY_SIZE){
+                    throw new IOException("Bad log entry at offset " + entryOffset);
+                }
+                buffer.flip();
+                LogEntry entry;
+                try{
+                    entry = LogEntry.decode(buffer);
+                }catch (RuntimeException e){
+                    throw new IOException("Bad log entry at offset " + entryOffset);
+                }
+                entries.add(entry);
+                totalBytes += LogEntry.ENTRY_SIZE;
+            }
+            return new FileReadBatch(entries, channel.position(), false);
+        }
+
     }
 
     @Override

@@ -195,11 +195,14 @@ public class WalWriter_V2 implements AutoCloseable {
                     if (writeBuffer.remaining() < LogEntry.ENTRY_SIZE) {
                         flush();
                     }
+                    ensureWritableSpace(LogEntry.ENTRY_SIZE);
 
                     // 在数据塞进buffer之前,记录位置
                     Long lsnOffset = writeBuffer.position() + fileChannel.position();
                     Long globalStart = currentIndex*maxFileSizeBytes + lsnOffset;
+
                     req.assignedLsn = globalStart + LogEntry.ENTRY_SIZE;
+
                     req.entry.encode(writeBuffer);
                 }
                 flush();
@@ -218,6 +221,32 @@ public class WalWriter_V2 implements AutoCloseable {
                 batch.clear();
             }
         }
+    }
+
+
+
+    //写空间前检查
+    private void  ensureWritableSpace(int entrySize)throws IOException{
+        if(entrySize > maxFileSizeBytes){
+            throw new IOException("Entry size is too large");
+        }
+        if (writeBuffer.remaining() < entrySize){
+            flush();
+        }
+        long segmentLocalPos = fileChannel.position() + writeBuffer.position();
+        if (segmentLocalPos + entrySize > maxFileSizeBytes){
+            flush();
+            rollToNextSegment();
+        }
+    }
+
+
+    //gundong
+    private void rollToNextSegment() throws IOException{
+        fileChannel.close();
+        currentIndex++;
+        fileChannel = openChannelForIndex(currentIndex);
+        fileChannel.position(0L);
     }
 
     private void flush() throws IOException {
@@ -242,7 +271,7 @@ public class WalWriter_V2 implements AutoCloseable {
 
     public void maybeRoll() throws IOException {
         Long size  = fileChannel.position(); // 文件写到哪里了
-        if (size >= maxFileSizeBytes) {
+        if (size >= maxFileSizeBytes ) {
             //1. 关闭当前文件
             fileChannel.close();
             currentIndex++;

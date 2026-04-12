@@ -11,4 +11,5 @@ import java.util.List;
 public class FileReadBatch {
     private List<LogEntry> entries;
     private long nextOffset;
+    private boolean reachFileEnd;
 }
