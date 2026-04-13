@@ -10,5 +10,5 @@ public interface MasterReplicationService {
 
     void onHeartbeat(HeartBeatDTO dto);
 
-    FetchResponse fetch(FetchRequest  req);
+    FetchResponse fetch(FetchRequest  req) throws Exception;
 }

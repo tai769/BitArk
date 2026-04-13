@@ -68,7 +68,7 @@ public class ReadServiceImpl implements ReadService {
 
     @Override
     public void readFromMaster (Long userId, Long msgId) throws Exception {
-        commandService.readFromMaster(userId, msgId);
+        commandService.applyReplicatedRead(userId, msgId);
     }
 
 
