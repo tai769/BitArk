@@ -16,7 +16,8 @@ import com.bitark.engine.service.command.ReadCommandService;
  * <p>它不负责：
  * 1. 定时拉取调度
  * 2. HTTP 请求发起
- * 3. 复制进度文件的底层存储实现
+ * 3. Pull 周期控制
+ * 4. 复制进度文件的底层存储实现
  */
 public class SlaveReplicationServiceImpl implements SlaveReplicationService{
 
@@ -40,13 +41,19 @@ public class SlaveReplicationServiceImpl implements SlaveReplicationService{
         return ack;
     }
 
+
     /**
      * Pull 模式下的批量复制执行入口。
      *
      * <p>这里只负责把一批数据交给命令服务落地，
      * 具体的 WAL 追加、内存应用和进度推进都在 ReadCommandService 内部完成。
      */
-    public void applyFetchBatch(FetchResponse response)throws Exception{
+    public void applyFetchBatch(FetchResponse response) throws Exception {
         readCommandService.applyFetchBatch(response);
+    }
+
+    @Override
+    public void handNeedFullSync() {
+
     }
 }

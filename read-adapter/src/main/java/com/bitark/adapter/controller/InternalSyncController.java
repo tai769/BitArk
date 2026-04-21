@@ -4,6 +4,7 @@ import com.bitark.commons.dto.*;
 import com.bitark.engine.replication.master.MasterReplicationService;
 import com.bitark.engine.replication.slave.SlaveReplicationService;
 import jakarta.annotation.Resource;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,6 +39,7 @@ public class InternalSyncController {
 
     }
 
+    @SneakyThrows
     @PostMapping("/fetch")
     public FetchResponse fetch(@RequestBody FetchRequest req){
         return  masterReplicationService.fetch(req);

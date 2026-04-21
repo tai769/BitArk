@@ -1,6 +1,8 @@
 package com.bitark.commons.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Pull 模式下，Slave 向 Master 发起的一次拉取请求。
@@ -11,6 +13,8 @@ import lombok.Data;
  * 3. 我这次最多还能接收多少数据（maxBytes）</p>
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class FetchRequest {
     private String slaveUrl;
     private Long fromLsn;
