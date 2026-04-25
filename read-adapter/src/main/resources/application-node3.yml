@@ -23,9 +23,10 @@ recovery:
 
 replication:
   master-url: http://localhost:8080
-  self-url: http://localhost:8081
+  self-url: http://localhost:8082
   max-lag-bytes: 100
   isr-join-streak: 3
+  pull-enabled: true
 
 
 # 日志配置

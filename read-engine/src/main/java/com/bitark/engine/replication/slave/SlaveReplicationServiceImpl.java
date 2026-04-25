@@ -5,6 +5,7 @@ import com.bitark.commons.dto.ReplicationAck;
 import com.bitark.commons.dto.ReplicationRequest;
 import com.bitark.engine.replication.config.ReplicationConfig;
 import com.bitark.engine.service.command.ReadCommandService;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Slave 侧复制执行器。
@@ -19,6 +20,7 @@ import com.bitark.engine.service.command.ReadCommandService;
  * 3. Pull 周期控制
  * 4. 复制进度文件的底层存储实现
  */
+@Slf4j
 public class SlaveReplicationServiceImpl implements SlaveReplicationService{
 
     private final ReadCommandService readCommandService;
@@ -53,7 +55,7 @@ public class SlaveReplicationServiceImpl implements SlaveReplicationService{
     }
 
     @Override
-    public void handNeedFullSync() {
-
+    public void handleNeedFullSync() {
+        log.warn("Need Full Sync, but full sync flow is not implemented yet");
     }
 }

@@ -7,6 +7,9 @@ import com.bitark.engine.replication.config.ReplicationConfig;
 import com.bitark.engine.replication.progress.ReplicationProgressStore;
 import com.bitark.engine.replication.slave.SlaveReplicationService;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
@@ -40,13 +43,19 @@ public class SlavePullScheduler {
 
     private ScheduledExecutorService executorService;
 
-    public SlavePullScheduler(ReplicationConfig replicationConfig, ReplicationProgressStore replicationProgressStore, RestTemplate restTemplate, SlaveReplicationService slaveReplicationService, ScheduledExecutorService executorService) {
+
+
+    public SlavePullScheduler(ReplicationConfig replicationConfig, ReplicationProgressStore replicationProgressStore, RestTemplate restTemplate, SlaveReplicationService slaveReplicationService,
+                              @Qualifier("pullScheduler")ScheduledExecutorService executorService) {
         this.replicationConfig = replicationConfig;
         this.replicationProgressStore = replicationProgressStore;
         this.restTemplate = restTemplate;
         this.slaveReplicationService = slaveReplicationService;
         this.executorService = executorService;
     }
+
+
+
 
     public void start(){
         executorService.scheduleAtFixedRate(() -> {
@@ -80,7 +89,7 @@ public class SlavePullScheduler {
             slaveReplicationService.applyFetchBatch(resp);
         }else {
             // Full Sync 是另一条链路。当前阶段先保留骨架，不和增量 Pull 混在一起实现。
-            slaveReplicationService.handNeedFullSync();
+            slaveReplicationService.handleNeedFullSync();
         }
     }
 }

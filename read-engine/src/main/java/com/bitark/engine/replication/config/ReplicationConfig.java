@@ -69,4 +69,6 @@ public class ReplicationConfig {
      */
     private int fetchBatchBytes = 64 * 1024;
 
+    private boolean pullEnabled = false;
+
 }

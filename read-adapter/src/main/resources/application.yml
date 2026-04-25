@@ -5,6 +5,9 @@ spring:
   application:
     name: read-service  # 应用名称
 
+
+
+
 # Web相关配置
 servlet:
   multipart:
@@ -28,6 +31,7 @@ replication:
   self-url: http://localhost:8081
   max-lag-bytes: 100
   isr-join-streak: 3
+  pull-enabled: false
 
 # 日志配置
 logging:
@@ -47,3 +51,4 @@ management:
     web:
       exposure:
         include: health,info,metrics
+

@@ -11,6 +11,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Master 侧复制编排实现。
+ *
+ * <p>它把复制请求转给两个核心组件：
+ * 1. ReplicationTracker：记录 Slave 进度、心跳和 ISR 状态
+ * 2. WalEngine：根据 globalLsn 读取增量 WAL，或提供 Full Sync 所需的快照边界</p>
+ */
 @Slf4j
 public class MasterReplicationServiceImpl implements MasterReplicationService{
 
@@ -39,6 +46,13 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
         tracker.onHeartbeat(dto.getSlaveUrl(), dto.getGlobalLsn());
     }
 
+    /**
+     * Pull 增量读取主入口。
+     *
+     * <p>关键边界：
+     * 如果 fromLsn 早于 earliestRetainedLsn，说明 Slave 需要的 WAL 已经被 GC，
+     * 这时不能继续返回增量，必须返回 NEED_FULL_SYNC。</p>
+     */
     @Override
     public FetchResponse fetch(FetchRequest req) throws Exception {
 
@@ -84,5 +98,26 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
         resp.setNextLsn(batch.getNextLsn());
         return resp;
 
+    }
+
+    /**
+     * Full Sync 全量同步主入口。
+     *
+     * <p>当前阶段先只建立协议入口。真正实现时，这里需要生成：
+     * 1. snapshotBytes：Master 当前完整状态
+     * 2. snapshotLsn：这份状态对应的全局 LSN</p>
+     */
+    @Override
+    public FullSyncResponse fullSync(FullSyncRequest req) throws Exception {
+        if (req == null){
+            throw  new IllegalArgumentException("Request is null");
+        }
+        if (req.getSlaveUrl() == null || req.getSlaveUrl().isBlank()){
+            throw new IllegalArgumentException("SlaveUrl is null");
+        }
+        if (req.getCurrentLsn() == null || req.getCurrentLsn() < 0){
+            throw new IllegalArgumentException("CurrentLsn is invalid");
+        }
+        return null;
     }
 }

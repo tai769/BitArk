@@ -5,6 +5,7 @@ import com.bitark.engine.replication.slave.SlaveReplicationService;
 import com.bitark.engine.replication.slave.SlaveReplicationServiceImpl;
 import com.bitark.engine.replication.tracker.ReplicationTracker;
 import com.bitark.engine.service.command.ReadCommandService;
+import com.bitark.engine.wal.WalEngine;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,8 +13,9 @@ import org.springframework.context.annotation.Configuration;
 public class ReplicationServiceConfig {
 
     @Bean
-    public MasterReplicationService masterReplicationService(ReplicationTracker tracker) {
-        return new MasterReplicationServiceImpl(tracker);
+    public MasterReplicationService masterReplicationService(ReplicationTracker tracker,
+                                                             WalEngine engine) {
+        return new MasterReplicationServiceImpl(tracker, engine);
     }
 
     @Bean

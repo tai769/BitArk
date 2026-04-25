@@ -45,6 +45,10 @@ public class ThreadPoolRegistrar {
         // 注册存活检测线程池
         registerIfAbsent("cluster", "liveness-pool",
                 () -> ThreadUtils.newSingleThreadScheduledExecutor("cluster-liveness", true), 15L);
+        // 注册 Pull 拉取调度线程池
+        registerIfAbsent("replication", "pull-pool",
+                () -> ThreadUtils.newSingleThreadScheduledExecutor("replication-pull", true),
+                10L);
     }
 
 

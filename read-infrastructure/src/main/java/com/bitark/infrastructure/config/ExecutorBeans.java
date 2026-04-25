@@ -38,4 +38,10 @@ public class ExecutorBeans {
     public ExecutorService replicationSyncExecutor() {
         return manager.get("replication", "sync-pool");
     }
+
+    @Bean("pullScheduler")
+    public ScheduledExecutorService pullScheduler() {
+        return (ScheduledExecutorService) manager.get("replication", "pull-pool");
+    }
+
 }

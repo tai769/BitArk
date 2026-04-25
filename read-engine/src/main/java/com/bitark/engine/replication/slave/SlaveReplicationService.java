@@ -14,5 +14,5 @@ public interface SlaveReplicationService {
 
     void applyFetchBatch(FetchResponse resp) throws Exception;
 
-    void handNeedFullSync();
+    void handleNeedFullSync();
 }
