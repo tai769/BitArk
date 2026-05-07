@@ -16,7 +16,7 @@ import com.bitark.engine.ReadStatusEngine;
  * 1. 将 ReadStatusEngine 序列化到本地 snapshot 文件
  * 2. 从本地 snapshot 文件恢复 ReadStatusEngine
  * 3. 将 ReadStatusEngine 序列化成内存 byte[]，供 Full Sync 通过网络传输</p>
- *
+     *
  * <p>它不负责：
  * 1. 决定什么时候生成快照
  * 2. 决定快照对应哪个 WAL LSN
@@ -49,10 +49,11 @@ public class SnapshotManager {
      */
     public byte[] dumpBytes(ReadStatusEngine engine) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream( bos);
-        engine.saveSnapshot(out);
-        out.flush();
-        return bos.toByteArray();
+        try (DataOutputStream out = new DataOutputStream(bos)) {
+            engine.saveSnapshot(out);
+            out.flush();
+            return bos.toByteArray();
+        }
     }
 
 }

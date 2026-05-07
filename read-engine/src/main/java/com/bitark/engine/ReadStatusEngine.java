@@ -7,6 +7,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.bitark.engine.userset.RoaringUserReadSet;
 import com.bitark.engine.userset.SetBasedUserReadSet;
@@ -21,35 +22,62 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ReadStatusEngine {
 
-    private ConcurrentHashMap<Long, UserReadSet> readStatus;
 
-     private final UserReadSetMode mode;
+
+
+    private volatile  ConcurrentHashMap<Long, UserReadSet> activeStatus;
+
+    private volatile  ConcurrentHashMap<Long, UserReadSet> frozenStatus;
+
+    private boolean snapshotInProgress = false;
+
+    private final ReentrantLock versionLock = new ReentrantLock();
+
+    private long lastAppliedLsn;
+
+    private final UserReadSetMode mode;
    
 
     public ReadStatusEngine() {
         this.mode = UserReadSetMode.ROARING;
-        this.readStatus = new ConcurrentHashMap<>();
-        ;
+        this.activeStatus = new ConcurrentHashMap<>();
+        this.frozenStatus = null;
+        this.lastAppliedLsn = 0L;
     }
     
     public ReadStatusEngine(UserReadSetMode mode) {
         this.mode = mode;
-        this.readStatus = new ConcurrentHashMap<>();
+        this.activeStatus = new ConcurrentHashMap<>();
     }
 
  
 
 
-    public void markRead(Long userId, Long msgId) {
-        readStatus.computeIfAbsent(userId, k -> newUserReadSet()).mark(msgId);  
+    public void markRead(Long userId, Long msgId, Long lsn) {
+        versionLock.lock();
+        try{
+            activeStatus.computeIfAbsent(userId, k -> newUserReadSet()).mark(msgId);
+            lastAppliedLsn = Math.max(lsn, lastAppliedLsn);
+        }finally {
+            versionLock.unlock();
+        }
     }
 
 
 
 
     public boolean isRead(Long userId, Long msgId) {
-        UserReadSet userReadSet = readStatus.get(userId);
-        return userReadSet != null && userReadSet.isRead(msgId);
+        UserReadSet active = activeStatus.get(userId);
+        if (active != null && active.isRead(msgId)){
+            return true;
+        }
+        ConcurrentHashMap<Long, UserReadSet> frozen = frozenStatus;
+        if (frozen == null) {
+            return false;
+        }
+
+        UserReadSet frozenSet = frozen.get(userId);
+        return frozenSet != null && frozenSet.isRead(msgId);
     }
 
 
@@ -69,8 +97,8 @@ public class ReadStatusEngine {
 
     public void saveSnapshot(DataOutputStream out){
         try{
-            out.writeInt(readStatus.size());
-            for(Map.Entry<Long, UserReadSet> entry : readStatus.entrySet()){
+            out.writeInt(activeStatus.size());
+            for(Map.Entry<Long, UserReadSet> entry : activeStatus.entrySet()){
                 out.writeLong(entry.getKey());
                 entry.getValue().toSnapshot(out);
             }
@@ -82,13 +110,15 @@ public class ReadStatusEngine {
 
     public void loadSnapshot(DataInputStream in){
         try{
-            readStatus.clear();
+            activeStatus.clear();
             int size = in.readInt();
             for(int i = 0; i < size; i++){
                 Long userId = in.readLong();
                 UserReadSet userReadSet = newUserReadSet();
                 userReadSet.loadSnapshot(in);
-                readStatus.put(userId, userReadSet);
+                activeStatus.put(userId, userReadSet);
+                frozenStatus = null;
+                snapshotInProgress = false;
             }
         }catch(Exception e){
             e.printStackTrace();

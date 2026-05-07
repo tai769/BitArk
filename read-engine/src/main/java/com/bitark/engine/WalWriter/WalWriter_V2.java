@@ -1,13 +1,14 @@
 package com.bitark.engine.WalWriter;
 
+import com.bitark.commons.log.WalRecord;
+import com.bitark.commons.log.WalRecordCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.wal.WalCheckpoint;
-import com.bitark.engine.WalReader.WalReader_V1;
+import com.bitark.engine.WalReader.WalReader;
 import com.bitark.engine.wal.WalConfig;
 
 import java.io.File;
@@ -63,12 +64,12 @@ public class WalWriter_V2 implements AutoCloseable {
         // 计算当前要replay的文件路径(只针对最后一个文件回放,后续在完善)
         String path = buildFilePath(baseDir, baseFileName, startIndex);
 
-        WalReader_V1 reader = new WalReader_V1();
+        WalReader reader = new WalReader();
         long initPosition;
         try {
-            initPosition = reader.replay(path, (LogEntry entry) -> {
+            initPosition = reader.replay(path, (WalRecord record) -> {
                 //暂时只是打印,真正的恢复在WalEngine.replay做
-                log.debug("Replay entry: {}", entry);
+                log.debug("Replay record: {}", record);
             });
            
         } catch (Exception e) {
@@ -159,11 +160,11 @@ public class WalWriter_V2 implements AutoCloseable {
     /*
      * 优化点2 ： 返回Future, 支持强一致性等待
      */
-    public CompletableFuture<Long> append(LogEntry entry) {
+    public CompletableFuture<Long> append(WalRecord record) {
         if (!running.get()) {
             throw new IllegalStateException("WalWriter is closed");
         }
-        WriteRequest req = new WriteRequest(entry);
+        WriteRequest req = new WriteRequest(record);
         if (!queue.offer(req)) {
             // 队列满
             CompletableFuture<Long> fail = new CompletableFuture<>();
@@ -192,24 +193,18 @@ public class WalWriter_V2 implements AutoCloseable {
 
                 // 序列化
                 for (WriteRequest req : batch) {
-                    if (writeBuffer.remaining() < LogEntry.ENTRY_SIZE) {
-                        flush();
-                    }
-                    ensureWritableSpace(LogEntry.ENTRY_SIZE);
+                    byte[] encoded = WalRecordCodec.encode(req.record);
+                    int recordLength = encoded.length;
+                    ensureWritableSpace(recordLength);
 
-                    // 在数据塞进buffer之前,记录位置
-                    Long lsnOffset = writeBuffer.position() + fileChannel.position();
-                    Long globalStart = currentIndex*maxFileSizeBytes + lsnOffset;
-
-                    req.assignedLsn = globalStart + LogEntry.ENTRY_SIZE;
-
-                    req.entry.encode(writeBuffer);
+                    writeBuffer.put(encoded);
+                    req.completedLeaderLsn = req.record.getLeaderLsn();
                 }
                 flush();
 
                 // 优化点4 落盘成功后， 统一回调
                 for (WriteRequest req : batch) {
-                    req.futrue.complete(req.assignedLsn);
+                    req.futrue.complete(req.completedLeaderLsn);
                 }
                 batch.clear();
             } catch (Exception e) {
@@ -226,15 +221,18 @@ public class WalWriter_V2 implements AutoCloseable {
 
 
     //写空间前检查
-    private void  ensureWritableSpace(int entrySize)throws IOException{
-        if(entrySize > maxFileSizeBytes){
-            throw new IOException("Entry size is too large");
+    private void  ensureWritableSpace(int recordLength)throws IOException{
+        if(recordLength > maxFileSizeBytes){
+            throw new IOException("record  is too large");
         }
-        if (writeBuffer.remaining() < entrySize){
+        if (recordLength > BUFFER_SIZE) {
+            throw new IOException("record is larger than write buffer");
+        }
+        if (writeBuffer.remaining() < recordLength){
             flush();
         }
         long segmentLocalPos = fileChannel.position() + writeBuffer.position();
-        if (segmentLocalPos + entrySize > maxFileSizeBytes){
+        if (segmentLocalPos + recordLength > maxFileSizeBytes){
             flush();
             rollToNextSegment();
         }
@@ -259,8 +257,8 @@ public class WalWriter_V2 implements AutoCloseable {
         }
 
         // 优化点5： force(false)
-        // 因为预分配了文件大小，文件元数据size没变化，之更新内容
-        // 传 false可以减少一次更新 Inode的IO操作
+        // force(false) 表示尽量只强制刷文件内容，不强制刷元数据。
+        // 但如果文件长度增长，操作系统仍可能需要更新元数据。
         fileChannel.force(false);
         writeBuffer.clear();
 
@@ -306,13 +304,11 @@ public class WalWriter_V2 implements AutoCloseable {
 
     @Data
     private static class WriteRequest {
-        final LogEntry entry;
-        final CompletableFuture<Long> futrue;
-        Long assignedLsn;
-        WriteRequest(LogEntry entry) {
-            this.entry = entry;
-            this.futrue = new CompletableFuture<>();
-
+        private  WalRecord record;
+        private CompletableFuture<Long> futrue = new CompletableFuture<>();
+        Long completedLeaderLsn;
+        WriteRequest(WalRecord record) {
+            this.record = record;
         }
     }
 

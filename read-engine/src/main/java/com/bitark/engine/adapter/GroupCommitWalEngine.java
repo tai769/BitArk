@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.bitark.engine.WalReader.FileReadBatch;
-import com.bitark.engine.WalReader.WalReader_V1;
+import com.bitark.engine.WalReader.WalReader;
 import com.bitark.engine.WalWriter.WalWriter_V2;
 import com.bitark.engine.wal.WalConfig;
 import com.bitark.commons.log.LogEntry;
@@ -24,14 +24,14 @@ public class GroupCommitWalEngine  implements WalEngine{
 
 
     private final WalWriter_V2 writer;
-    private final WalReader_V1 reader;
+    private final WalReader reader;
     private final WalConfig config;
     private volatile long earliestRetainedLsn;
 
     public GroupCommitWalEngine(WalConfig config) throws IOException {
         this.config = config;
         this.writer = WalWriter_V2.init(config);
-        this.reader = new WalReader_V1();
+        this.reader = new WalReader();
         this.earliestRetainedLsn = calcEarliestRetainedLsn();
     }
 

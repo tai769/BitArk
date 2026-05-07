@@ -1,6 +1,5 @@
 package com.bitark.engine.WalReader;
 
-import lombok.extern.java.Log;
 import lombok.extern.slf4j.Slf4j;
 import com.bitark.commons.log.LogEntry;
 import com.bitark.commons.log.LogEntryHandler;
@@ -15,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
-public class WalReader_V1 implements AutoCloseable{
+public class WalReader implements AutoCloseable{
 
     public long replay(String path, LogEntryHandler handler) throws  Exception{
         try(RandomAccessFile raf = new RandomAccessFile(path,"rw");
