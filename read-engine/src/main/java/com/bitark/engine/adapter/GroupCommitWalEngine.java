@@ -2,17 +2,14 @@ package com.bitark.engine.adapter;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import com.bitark.engine.WalReader.FileReadBatch;
+import com.bitark.commons.log.WalRecord;
+import com.bitark.commons.log.WalRecordHandler;
 import com.bitark.engine.WalReader.WalReader;
 import com.bitark.engine.WalWriter.WalWriter_V2;
 import com.bitark.engine.wal.WalConfig;
-import com.bitark.commons.log.LogEntry;
-import com.bitark.commons.log.LogEntryHandler;
 import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.wal.WalEngine;
 
@@ -36,11 +33,11 @@ public class GroupCommitWalEngine  implements WalEngine{
     }
 
     @Override
-    public Long append(LogEntry entry) {
+    public Long append(WalRecord record) {
         try{
             //1. 调用底层的appenWalCheckpointd
             CompletableFuture<Long>
-                    future = writer.append(entry);
+                    future = writer.append(record);
 
             //2. 关键调用.join同步等待磁盘写入返回lsn
             return future.join();
@@ -51,7 +48,7 @@ public class GroupCommitWalEngine  implements WalEngine{
     }
 
     @Override
-    public Long replay(LogEntryHandler handler) throws Exception {
+    public Long replay(WalRecordHandler handler) throws Exception {
 
           //1. 列出目录下的文件
         File[] files = listAndSortSegments();
@@ -91,7 +88,7 @@ public class GroupCommitWalEngine  implements WalEngine{
     }
 
     @Override
-    public Long replayFrom(WalCheckpoint checkpoint, LogEntryHandler handler) throws Exception {
+    public Long replayFrom(WalCheckpoint checkpoint, WalRecordHandler handler) throws Exception {
         String baseName = config.getWalFileName();
         File[] files = listAndSortSegments();
 
@@ -159,52 +156,9 @@ public class GroupCommitWalEngine  implements WalEngine{
 
     @Override
     public WalReadBatch readBatch(Long fromLsn, Integer maxBytes) throws Exception {
-        //1. 把全局LSN变成checkPont
-        WalCheckpoint start = toCheckpoint(fromLsn);
-        String baseName = config.getWalFileName();
-        List<LogEntry> allEntries = new ArrayList<>();
-        int finalSegmentIndex = start.getSegmentIndex();
-        long finalOffset = start.getSegmentOffset();
-        int totalBytes = 0;
-        //2. 拿到所有的segment文件
-        File[] files = listAndSortSegments();
-        if (files.length == 0) {
-            return new WalReadBatch(new ArrayList<>(), fromLsn);
-        }
-        for (File f : files){
-            int idx = parseIndex(f.getName(), baseName);
-            if ( idx < finalSegmentIndex){
-                continue;
-            }
-
-            // 决定当前文件从哪里读
-            long startOffset;
-            if (idx == finalSegmentIndex){
-                startOffset = finalOffset;
-            }else {
-                startOffset = 0L;
-            }
-            int remainBytes = maxBytes - totalBytes;
-            if (remainBytes < LogEntry.ENTRY_SIZE){
-                break;
-            }
-            FileReadBatch fileBatch = reader.readBatch(f.getAbsolutePath(), startOffset, remainBytes);
-            // 计算这次还能读多少字节
-            allEntries.addAll(fileBatch.getEntries());
-            totalBytes += fileBatch.getEntries().size()*LogEntry.ENTRY_SIZE;
-            finalSegmentIndex = idx;
-            finalOffset = fileBatch.getNextOffset();
-
-            if (totalBytes >= maxBytes){
-                break;
-            }
-            if (!fileBatch.isReachFileEnd()){
-                break;
-            }
-
-        }
-        long nextLsn = finalSegmentIndex*config.getMaxFileSizeBytes() + finalOffset;
-        return new WalReadBatch(allEntries, nextLsn);
+        throw new UnsupportedOperationException(
+                "readBatch requires WalIndex after WalRecord migration"
+        );
     }
 
     private File[] listAndSortSegments(){

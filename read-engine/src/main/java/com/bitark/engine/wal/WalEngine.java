@@ -1,23 +1,22 @@
 package com.bitark.engine.wal;
 
-import com.bitark.commons.log.LogEntry;
-import com.bitark.commons.log.LogEntryHandler;
+import com.bitark.commons.log.WalRecord;
+import com.bitark.commons.log.WalRecordHandler;
 import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.adapter.WalReadBatch;
 
 
 public interface WalEngine {
 
-    Long append(LogEntry entry);
+    Long append(WalRecord record);
 
-    Long replay(LogEntryHandler handler) throws Exception;
+    Long replay(WalRecordHandler handler) throws Exception;
 
     void close() throws Exception;
 
     WalCheckpoint currCheckpoint() throws Exception;
 
-    Long replayFrom(WalCheckpoint checkpoint, LogEntryHandler handler) throws Exception;
-
+    Long replayFrom(WalCheckpoint checkpoint, WalRecordHandler handler) throws Exception;
 
     void gcOldSegment(WalCheckpoint checkpoint) throws Exception;
 
@@ -25,6 +24,6 @@ public interface WalEngine {
 
     long earliestRetainedLsn();
 
-    WalReadBatch readBatch(Long fromLsn, Integer maxBytes) throws Exception;
+    WalReadBatch 3(Long fromLsn, Integer maxBytes) throws Exception;
 
 }

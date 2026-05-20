@@ -1,8 +1,7 @@
 package com.bitark.engine.WalReader;
 
+import com.bitark.commons.log.*;
 import lombok.extern.slf4j.Slf4j;
-import com.bitark.commons.log.LogEntry;
-import com.bitark.commons.log.LogEntryHandler;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -16,37 +15,19 @@ import java.util.List;
 @Slf4j
 public class WalReader implements AutoCloseable{
 
-    public long replay(String path, LogEntryHandler handler) throws  Exception{
+    public long replay(String path, WalRecordHandler handler) throws  Exception{
         try(RandomAccessFile raf = new RandomAccessFile(path,"rw");
             FileChannel channel = raf.getChannel();
         ){
-            ByteBuffer buffer = ByteBuffer.allocate(LogEntry.ENTRY_SIZE);
+            while (true){
+                long recordOffset = channel.position();
 
-            while ( true){
-                long startOffset = channel.position();
+                WalRecord record = readOneRecord(channel);
 
-                //1. 尝试填满21个字节
-                buffer.clear();
-                int bytesRead = readFull(channel, buffer);
-                if (bytesRead == -1){
-                    return startOffset; //文件完美读完 ;
+                if (record == null){
+                    return recordOffset;
                 }
-                if (bytesRead < LogEntry.ENTRY_SIZE){
-                    // 如果读取到的字段 < 21 说明最后一条日志是坏的
-                    log.error("Bad log entry at offset {}", startOffset);
-                    channel.truncate(startOffset); // 截断文件
-                    return startOffset;
-                }
-                buffer.flip();
-                try {
-                    LogEntry entry = LogEntry.decode(buffer);
-                    handler.handle(entry);//回调给业务
-                } catch (RuntimeException e) {
-                    log.error("日志条目解析失败: {}", e.getMessage());
-                    // 截断到当前条目的起始位置，丢弃损坏的数据
-                    channel.truncate(startOffset);
-                    return startOffset;
-                }
+                handler.handle(record);
             }
         }
 
@@ -54,40 +35,59 @@ public class WalReader implements AutoCloseable{
 
 
 
+    private WalRecord readOneRecord(FileChannel channel)throws IOException{
+        long recordStartOffset = channel.position();
 
-    public long replay(String path, long startOffset, LogEntryHandler handler) throws Exception {
+        ByteBuffer lengthBuffer = ByteBuffer.allocate(WalRecordCodec.RECORD_LENGTH_SIZE);
+        int lengthBytes = readFull(channel, lengthBuffer);
+        if (lengthBytes == -1){
+            return null;
+        }
+        if (lengthBytes < WalRecordCodec.RECORD_LENGTH_SIZE ){
+            channel.truncate(recordStartOffset);
+            throw new IOException("Bad log entry at offset " + recordStartOffset);
+        }
+
+        lengthBuffer.flip();
+        int recordLength = lengthBuffer.getInt();
+        if (recordLength < WalRecordCodec.FIXED_HEADER_SIZE + WalRecordCodec.CRC_SIZE ){
+            channel.truncate(recordStartOffset);
+            throw new IOException("Invalid record length at offset " + recordStartOffset + ": " + recordLength);
+        }
+        ByteBuffer recordBuffer = ByteBuffer.allocate(recordLength);
+        recordBuffer.putInt(recordLength);
+
+        int bodyBytes = readFull(channel, recordBuffer);
+        int expectedBodyBytes = recordLength - WalRecordCodec.RECORD_LENGTH_SIZE;
+        if (bodyBytes < expectedBodyBytes) {
+            channel.truncate(recordStartOffset);
+            throw new IOException("Incomplete record body at offset " + recordStartOffset);
+        }
+        recordBuffer.flip();
+        try {
+            return WalRecordCodec.decode(recordBuffer);
+        } catch (RuntimeException e) {
+            channel.truncate(recordStartOffset);
+            throw new IOException("Bad wal record at offset " + recordStartOffset, e);
+        }
+    }
+
+
+    public long replay(String path, long startOffset, WalRecordHandler handler) throws Exception {
         try(RandomAccessFile raf = new RandomAccessFile(path,"rw");
             FileChannel channel = raf.getChannel();
         ){
             //从指定的 offset
             channel.position(startOffset);
 
-            ByteBuffer buffer = ByteBuffer.allocate(LogEntry.ENTRY_SIZE);
 
             while (true) {
-                long entryOffset = channel.position();
-                buffer.clear();
-                int bytesRead = readFull(channel, buffer);
-                if (bytesRead == -1) {
-                    return entryOffset;
+                long recordOffset = channel.position();
+                WalRecord record = readOneRecord(channel);
+                if (record == null){
+                    return recordOffset;
                 }
-
-                if (bytesRead < LogEntry.ENTRY_SIZE) {
-                    // 如果读取到的字段 < 21 说明最后一条日志是坏的
-                    log.error("Bad log entry at offset {}", entryOffset);
-                    channel.truncate(entryOffset);
-                    return entryOffset;
-                }
-                buffer.flip();
-                try {
-                    LogEntry entry = LogEntry.decode(buffer);
-                    handler.handle(entry);
-                }catch (RuntimeException e) {
-                    log.error("日志条目解析失败: {}", e.getMessage());
-                    channel.truncate(entryOffset);
-                    // 截断到当前条目的起始位置，丢弃损坏的数据
-                    return entryOffset;
-                }
+                handler.handle(record);
             }
         }
     }
@@ -111,33 +111,31 @@ public class WalReader implements AutoCloseable{
         if(!file.exists()){
             throw  new FileNotFoundException("Wal Segment not exist " + path);
         }
-        List<LogEntry> entries = new ArrayList<>();
+        List<WalRecord> records = new ArrayList<>();
         int totalBytes = 0;
         try(RandomAccessFile raf = new RandomAccessFile(path,"r");
             FileChannel channel = raf.getChannel()){
             channel.position(startOffset);
-            ByteBuffer buffer = ByteBuffer.allocate(LogEntry.ENTRY_SIZE);
-            while (totalBytes + LogEntry.ENTRY_SIZE <= maxBytes){
-                long entryOffset = channel.position();
-                buffer.clear();
-                int bytesRead = readFull(channel, buffer);
-                if (bytesRead == -1){
-                    return new FileReadBatch(entries, entryOffset,true);
+            while (totalBytes < maxBytes){
+
+                long recordOffset = channel.position();
+                WalRecord record = readOneRecord(channel);
+                if (record == null){
+                    return new FileReadBatch(records, recordOffset, true);
                 }
-                if(bytesRead < LogEntry.ENTRY_SIZE){
-                    throw new IOException("Bad log entry at offset " + entryOffset);
+                int recordLength = WalRecordCodec.recordLength(record);
+                if (totalBytes + recordLength  > maxBytes){
+                    if (records.isEmpty()){
+                        records.add( record);
+                        return new FileReadBatch(records, recordOffset, false);
+                    }
+                    channel.position(recordOffset);
+                    return new FileReadBatch(records, recordOffset, false);
                 }
-                buffer.flip();
-                LogEntry entry;
-                try{
-                    entry = LogEntry.decode(buffer);
-                }catch (RuntimeException e){
-                    throw new IOException("Bad log entry at offset " + entryOffset);
-                }
-                entries.add(entry);
-                totalBytes += LogEntry.ENTRY_SIZE;
+                records.add(record);
+                totalBytes += recordLength;
             }
-            return new FileReadBatch(entries, channel.position(), false);
+            return new FileReadBatch(records, channel.position(), false);
         }
 
     }
