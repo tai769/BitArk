@@ -2,6 +2,8 @@ package com.bitark.engine.WalWriter;
 
 import com.bitark.commons.log.WalRecord;
 import com.bitark.commons.log.WalRecordCodec;
+import com.bitark.engine.wal.WalIndex;
+import com.bitark.engine.wal.WalPosition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,7 @@ public class WalWriter_V2 implements AutoCloseable {
     private static final long MAX_WAIT_MS = 5; // group commit 策略调整
 
 
+    private final WalIndex walIndex;
     private final String baseDir;
     private final String baseFileName;
     private final long maxFileSizeBytes; 
@@ -52,7 +55,7 @@ public class WalWriter_V2 implements AutoCloseable {
     private Thread ioThread;
 
     // 初始化
-    public static WalWriter_V2 init(WalConfig config) throws IOException {
+    public static WalWriter_V2 init(WalConfig config, WalIndex walIndex) throws IOException {
         
         String baseDir = config.getWalDir();
         String baseFileName = config.getWalFileName();
@@ -77,7 +80,7 @@ public class WalWriter_V2 implements AutoCloseable {
             log.error("初始化失败");
             initPosition = 0L;
         }
-        return new WalWriter_V2(baseDir, baseFileName, maxFileSizeBytes, startIndex, initPosition);
+        return new WalWriter_V2(baseDir, baseFileName, maxFileSizeBytes, startIndex, initPosition,walIndex);
 
     }
 
@@ -115,11 +118,11 @@ public class WalWriter_V2 implements AutoCloseable {
         return dir + File.separator + fileName + "." + index;
     }
 
-    public static WalWriter_V2 getInstance(WalConfig config) throws IOException {
+    public static WalWriter_V2 getInstance(WalConfig config,WalIndex walIndex) throws IOException {
         if (instance == null) {
             synchronized (WalWriter_V2.class) {
                 if (instance == null) {
-                    instance = init(config);
+                    instance = init(config, walIndex);
                 }
             }
         }
@@ -127,7 +130,8 @@ public class WalWriter_V2 implements AutoCloseable {
     }
 
 
-    public WalWriter_V2(String baseDir, String baseFileName, Long maxFileSizeBytes, int startIndex, long initPosition) throws IOException {
+    public WalWriter_V2(String baseDir, String baseFileName, Long maxFileSizeBytes, int startIndex, long initPosition,
+                        WalIndex walIndex) throws IOException {
         this.baseDir = baseDir;
         this.baseFileName = baseFileName;
         this.maxFileSizeBytes = maxFileSizeBytes;
@@ -137,9 +141,10 @@ public class WalWriter_V2 implements AutoCloseable {
         this.fileChannel.position(initPosition);
         this.writeBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
         this.queue = new ArrayBlockingQueue<>(QUEUE_SIZE);
-
+        this.walIndex = walIndex;
         this.ioThread = new Thread(this::ioLoop, "wal-v2-writer");
-        this.ioThread.start();    
+        this.ioThread.start();
+
     }
 
 
@@ -196,14 +201,20 @@ public class WalWriter_V2 implements AutoCloseable {
                     byte[] encoded = WalRecordCodec.encode(req.record);
                     int recordLength = encoded.length;
                     ensureWritableSpace(recordLength);
-
+                    WalPosition position = new WalPosition(
+                            currentIndex,
+                            fileChannel.position() + writeBuffer.position(),
+                            recordLength
+                    );
                     writeBuffer.put(encoded);
+                    req.position = position;
                     req.completedLeaderLsn = req.record.getLeaderLsn();
                 }
                 flush();
 
                 // 优化点4 落盘成功后， 统一回调
                 for (WriteRequest req : batch) {
+                    walIndex.put(req.record.getLeaderLsn(), req.position);
                     req.futrue.complete(req.completedLeaderLsn);
                 }
                 batch.clear();
@@ -305,6 +316,7 @@ public class WalWriter_V2 implements AutoCloseable {
     @Data
     private static class WriteRequest {
         private  WalRecord record;
+        private WalPosition position;
         private CompletableFuture<Long> futrue = new CompletableFuture<>();
         Long completedLeaderLsn;
         WriteRequest(WalRecord record) {

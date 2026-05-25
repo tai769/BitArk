@@ -13,6 +13,7 @@ import com.bitark.engine.wal.WalConfig;
 import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.wal.WalEngine;
 
+import com.bitark.engine.wal.WalIndex;
 import lombok.extern.slf4j.Slf4j;
 
 
@@ -20,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 public class GroupCommitWalEngine  implements WalEngine{
 
 
+    private final WalIndex walIndex;
     private final WalWriter_V2 writer;
     private final WalReader reader;
     private final WalConfig config;
@@ -27,7 +29,8 @@ public class GroupCommitWalEngine  implements WalEngine{
 
     public GroupCommitWalEngine(WalConfig config) throws IOException {
         this.config = config;
-        this.writer = WalWriter_V2.init(config);
+        this.walIndex = new WalIndex();
+        this.writer = WalWriter_V2.init(config, walIndex);
         this.reader = new WalReader();
         this.earliestRetainedLsn = calcEarliestRetainedLsn();
     }

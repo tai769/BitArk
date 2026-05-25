@@ -130,7 +130,7 @@ public class WalReader implements AutoCloseable{
                         return new FileReadBatch(records, recordOffset, false);
                     }
                     channel.position(recordOffset);
-                    return new FileReadBatch(records, recordOffset, false);
+                    return new FileReadBatch(records, channel.position(), false);
                 }
                 records.add(record);
                 totalBytes += recordLength;
