@@ -2,6 +2,7 @@ package com.bitark.engine.service.command;
 
 import com.bitark.commons.dto.FetchResponse;
 import com.bitark.commons.dto.ReplicationRequest;
+import com.bitark.commons.log.WalRecord;
 
 /**
  * 写路径命令服务接口。
@@ -21,12 +22,7 @@ public interface ReadCommandService {
     /**
      * Slave 应用上游复制数据时的本地落地入口。
      */
-    void applyReplicatedRead(Long userId, Long msgId) throws Exception;
-
-    /**
-     * 旧 Push 模式下的单条复制适配方法。
-     */
-    Long applyReplication(ReplicationRequest req) throws Exception;
+    void applyReplicatedRead(WalRecord record) throws Exception;
 
     /**
      * Pull 模式下的批量复制应用入口。

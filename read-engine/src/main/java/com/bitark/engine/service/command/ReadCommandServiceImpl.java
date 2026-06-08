@@ -1,15 +1,20 @@
 package com.bitark.engine.service.command;
 
+import com.bitark.commons.command.ReadMarkCommand;
+import com.bitark.commons.command.ReadMarkCommandCodec;
 import com.bitark.commons.dto.FetchEntryDTO;
 import com.bitark.commons.dto.FetchResponse;
-import com.bitark.commons.dto.ReplicationRequest;
-import com.bitark.commons.log.LogEntry;
+import com.bitark.commons.enums.CommandTypes;
+import com.bitark.commons.log.WalRecord;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.replication.progress.ReplicationProgressStore;
 import com.bitark.engine.replication.sender.ReplicationSender;
-import com.bitark.engine.wal.WalEngine;
+import com.bitark.engine.service.apply.ReadStateMachineApplier;
+import com.bitark.engine.wal.AppendResult;
+import com.bitark.engine.wal.LogEngine;
+import lombok.extern.slf4j.Slf4j;
 
-import java.io.IOException;
+
 import java.util.List;
 
 /**
@@ -25,19 +30,22 @@ import java.util.List;
  * 2. 定时调度
  * 3. 主从角色判断
  */
+@Slf4j
 public class ReadCommandServiceImpl implements ReadCommandService {
 
-    private final WalEngine walEngine;
-    private final ReadStatusEngine engine;
-    // 过渡期保留：Push 主链完全删除前仍保留依赖，但当前主路径已切到 Pull。
-    private final ReplicationSender replicationSender;
     private final ReplicationProgressStore progressStore;
 
-    public ReadCommandServiceImpl(WalEngine walEngine, ReadStatusEngine engine, ReplicationSender replicationSender, ReplicationProgressStore progressStore) {
-        this.walEngine = walEngine;
-        this.engine = engine;
-        this.replicationSender = replicationSender;
-        this.progressStore = progressStore;
+    private final ReadStateMachineApplier applier;
+
+    private final LogEngine logEngine;
+
+    public ReadCommandServiceImpl( ReadStateMachineApplier applier,
+                                   LogEngine logEngine,
+                                   ReplicationProgressStore store) {
+
+        this.logEngine = logEngine;
+        this.progressStore = store;
+        this.applier = applier;
     }
 
     /**
@@ -51,12 +59,19 @@ public class ReadCommandServiceImpl implements ReadCommandService {
      */
     @Override
     public void read(Long userId, Long msgId) throws Exception {
-        LogEntry entry = new LogEntry(LogEntry.READ_ENTRY, userId, msgId);
-        walEngine.append(entry);
-        engine.markRead(userId, msgId);
 
-        // 旧 Push 主链已停用。
-        // replicationSender.sendRead(userId, msgId, lsn);
+        ReadMarkCommand command = new ReadMarkCommand(userId,msgId);
+        byte[] payload = ReadMarkCommandCodec.encode(command);
+
+        WalRecord record = WalRecord.create(CommandTypes.READ_MARK, payload);
+
+        logEngine.appendAsLeader(record);
+
+
+        applier.apply(record);
+
+
+
     }
 
     /**
@@ -65,38 +80,30 @@ public class ReadCommandServiceImpl implements ReadCommandService {
      * <p>这里只做本地状态变更，不推进外部复制，不做网络发送。
      */
     @Override
-    public void applyReplicatedRead(Long userId, Long msgId) throws Exception {
-        LogEntry entry = new LogEntry(LogEntry.READ_ENTRY, userId, msgId);
-        walEngine.append(entry);
-        engine.markRead(userId, msgId);
+    public void applyReplicatedRead(WalRecord record) throws Exception {
+        logEngine.appendReplicated(record);
+
+        applier.apply(record);
+
+
     }
 
     /**
      * Pull 模式下的批量应用方法。
      *
      * <p>关键边界：
-     * 这里必须走 {@link #applyReplicatedRead(Long, Long)}，而不能走 {@link #read(Long, Long)}。
      * 因为这是“复制数据落地”，不是“本地业务写入”。两者职责必须分开。
      */
     public void applyFetch(List<FetchEntryDTO> entryDTOList) throws Exception {
         for (FetchEntryDTO fetchEntry : entryDTOList){
-            this.applyReplicatedRead(fetchEntry.getUserId(),
-                    fetchEntry.getMsgId());
+            WalRecord record = new WalRecord(fetchEntry.getLeaderLsn(),
+                    fetchEntry.getEpoch(),
+                    fetchEntry.getType(),
+                    fetchEntry.getPayload());
+            this.applyReplicatedRead(record);
         }
     }
 
-    /**
-     * 旧 Push 模式下的单条复制适配方法。
-     *
-     * <p>这是历史兼容路径。Pull 主链稳定后，这个方法和相关 DTO 可以进一步下线。
-     */
-    @Override
-    public Long applyReplication(ReplicationRequest req) throws Exception {
-        applyReplicatedRead(req.getUserId(), req.getMsgId());
-        Long masterLsn = req.getGlobalLsn();
-        progressStore.save(masterLsn);
-        return masterLsn;
-    }
 
     /**
      * Pull 模式下的批量复制应用入口。

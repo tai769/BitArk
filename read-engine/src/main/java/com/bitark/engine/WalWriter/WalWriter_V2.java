@@ -4,6 +4,7 @@ import com.bitark.commons.log.WalRecord;
 import com.bitark.commons.log.WalRecordCodec;
 import com.bitark.engine.wal.WalIndex;
 import com.bitark.engine.wal.WalPosition;
+import com.bitark.engine.wal.store.WriterResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -165,14 +166,14 @@ public class WalWriter_V2 implements AutoCloseable {
     /*
      * 优化点2 ： 返回Future, 支持强一致性等待
      */
-    public CompletableFuture<Long> append(WalRecord record) {
+    public CompletableFuture<WriterResult> append(WalRecord record) {
         if (!running.get()) {
             throw new IllegalStateException("WalWriter is closed");
         }
         WriteRequest req = new WriteRequest(record);
         if (!queue.offer(req)) {
             // 队列满
-            CompletableFuture<Long> fail = new CompletableFuture<>();
+            CompletableFuture<WriterResult> fail = new CompletableFuture<>();
             fail.completeExceptionally(new RuntimeException("WalWriter queue is full"));
             return fail; // Changed from return fail.completedFuture(true);
         }
@@ -215,7 +216,7 @@ public class WalWriter_V2 implements AutoCloseable {
                 // 优化点4 落盘成功后， 统一回调
                 for (WriteRequest req : batch) {
                     walIndex.put(req.record.getLeaderLsn(), req.position);
-                    req.futrue.complete(req.completedLeaderLsn);
+                    req.futrue.complete(new WriterResult(req.record,req.position));
                 }
                 batch.clear();
             } catch (Exception e) {

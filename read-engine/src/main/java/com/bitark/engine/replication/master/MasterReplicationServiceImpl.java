@@ -1,9 +1,13 @@
 package com.bitark.engine.replication.master;
 
+import com.bitark.commons.command.ReadMarkCommand;
+import com.bitark.commons.command.ReadMarkCommandCodec;
 import com.bitark.commons.dto.*;
 import com.bitark.commons.log.LogEntry;
+import com.bitark.commons.log.WalRecord;
 import com.bitark.engine.adapter.WalReadBatch;
 import com.bitark.engine.replication.tracker.ReplicationTracker;
+import com.bitark.engine.wal.LogEngine;
 import com.bitark.engine.wal.WalEngine;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,8 +29,11 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
 
     private WalEngine walEngine;
 
-    public MasterReplicationServiceImpl(ReplicationTracker tracker, WalEngine walEngine) {
+    private LogEngine logEngine;
+
+    public MasterReplicationServiceImpl(ReplicationTracker tracker, WalEngine walEngine, LogEngine logEngine) {
         this.tracker = tracker;
+        this.logEngine = logEngine;
         this.walEngine = walEngine;
     }
 
@@ -87,10 +94,12 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
         //4. Pull 模式下，读取一批 WAL 并转换成批量返回 DTO
         WalReadBatch batch = walEngine.readBatch(req.getFromLsn(), req.getMaxBytes());
         List<FetchEntryDTO> entries = new ArrayList<>();
-        for (LogEntry entry :  batch.getEntries()){
+        for (WalRecord record :  batch.getRecords()){
             FetchEntryDTO item = new FetchEntryDTO();
-            item.setUserId(entry.getUserId());
-            item.setMsgId(entry.getMsgId());
+            item.setLeaderLsn(record.getLeaderLsn());
+            item.setPayload(record.getPayload());
+            item.setType(record.getType());
+            item.setEpoch(record.getEpoch());
             entries.add(item);
         }
         resp.setStatus(FetchStatus.OK);

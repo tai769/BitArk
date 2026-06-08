@@ -24,6 +24,6 @@ public interface WalEngine {
 
     long earliestRetainedLsn();
 
-    WalReadBatch 3(Long fromLsn, Integer maxBytes) throws Exception;
+    WalReadBatch readBatch(Long fromLsn, Integer maxBytes) throws Exception;
 
 }

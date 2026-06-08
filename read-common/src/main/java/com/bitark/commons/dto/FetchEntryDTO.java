@@ -12,6 +12,9 @@ import lombok.Data;
 @Data
 public class FetchEntryDTO {
 
-    private Long userId;
-    private Long msgId;
+
+    private Long leaderLsn;
+    private Integer epoch;
+    private Short type;
+    private byte[] payload;
 }

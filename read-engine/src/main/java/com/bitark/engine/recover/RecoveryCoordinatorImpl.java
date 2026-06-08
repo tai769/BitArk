@@ -1,8 +1,13 @@
 package com.bitark.engine.recover;
 
+import com.bitark.commons.command.ReadMarkCommand;
+import com.bitark.commons.command.ReadMarkCommandCodec;
+import com.bitark.commons.enums.CommandTypes;
 import com.bitark.commons.wal.WalCheckpoint;
 import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.checkpoint.CheckpointManager;
+import com.bitark.engine.service.apply.ReadStateMachineApplier;
+import com.bitark.engine.wal.LogEngine;
 import com.bitark.engine.wal.WalEngine;
 import lombok.extern.slf4j.Slf4j;
 
@@ -17,16 +22,22 @@ public class RecoveryCoordinatorImpl implements RecoveryCoordinator {
 
 
     private final WalEngine walEngine;
+
+    private final LogEngine logEngine;
     private final SnapshotManager snapshotManager;
     private final CheckpointManager checkpointManager;
     private final RecoveryConfig recoveryConfig;
 
+    private final ReadStateMachineApplier applier;
 
-    public RecoveryCoordinatorImpl(WalEngine walEngine, RecoveryConfig recoveryConfig) {
+
+    public RecoveryCoordinatorImpl(WalEngine walEngine,ReadStateMachineApplier applier, RecoveryConfig recoveryConfig,LogEngine logEngine) {
         this.walEngine = walEngine;
         this.recoveryConfig = recoveryConfig;
         this.snapshotManager = new SnapshotManager(Paths.get(recoveryConfig.getSnapshotPath()));
         this.checkpointManager = new CheckpointManager(Paths.get(recoveryConfig.getCheckpointPath()));
+        this.logEngine = logEngine;
+        this.applier = applier;
     }
     @Override
     public void recover(ReadStatusEngine engine) throws Exception {
@@ -52,9 +63,13 @@ public class RecoveryCoordinatorImpl implements RecoveryCoordinator {
         }
 
         if (localCheckpoint == null){
-            walEngine.replay(entry -> engine.markRead(entry.getUserId(), entry.getMsgId()));
+            walEngine.replay(record -> {
+                if (record.getType() == CommandTypes.READ_MARK){
+                    applier.apply(record);
+                }
+            });
         }else {
-            walEngine.replayFrom(localCheckpoint, entry -> engine.markRead(entry.getUserId(), entry.getMsgId()));
+            logEngine.replay(record -> applier.apply(record));
         }
         log.info("Recovery completed.");
 

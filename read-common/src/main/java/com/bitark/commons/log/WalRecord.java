@@ -62,4 +62,12 @@ public class WalRecord {
         }
         return payload.length;
     }
+
+    public  static  WalRecord create(short type, byte[] payload){
+        return  new WalRecord(0,1,type,payload);
+    }
+
+    public boolean hasLeaderLsn(){
+        return leaderLsn > 0;
+    }
 }
