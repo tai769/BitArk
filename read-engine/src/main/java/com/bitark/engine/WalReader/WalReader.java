@@ -140,6 +140,15 @@ public class WalReader implements AutoCloseable{
 
     }
 
+
+    public WalRecord readFirstRecord(String path)throws Exception{
+        try (RandomAccessFile raf = new RandomAccessFile(path,"r");
+            FileChannel channel = raf.getChannel()){
+            return readOneRecord(channel);
+         }
+
+    }
+
     @Override
     public void close() throws Exception {
         // WalReader_V1 使用 try-with-resources 自动管理资源

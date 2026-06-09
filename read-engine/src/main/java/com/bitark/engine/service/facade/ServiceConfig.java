@@ -6,7 +6,6 @@ import com.bitark.engine.ReadStatusEngine;
 import com.bitark.engine.recover.RecoveryCoordinator;
 import com.bitark.engine.replication.bootstrap.ReplicationBootstrapper;
 import com.bitark.engine.replication.progress.ReplicationProgressStore;
-import com.bitark.engine.replication.sender.ReplicationSender;
 import com.bitark.engine.replication.tracker.ReplicationTracker;
 import com.bitark.engine.service.apply.ReadStateMachineApplier;
 import com.bitark.engine.service.command.ReadCommandService;
@@ -25,6 +24,11 @@ public class ServiceConfig {
     @Bean
     public ReadStatusEngine readStatusEngine() {
         return new ReadStatusEngine();
+    }
+
+    @Bean
+    public ReadStateMachineApplier readStateMachineApplier(ReadStatusEngine engine) {
+        return new ReadStateMachineApplier(engine);
     }
 
     @Bean

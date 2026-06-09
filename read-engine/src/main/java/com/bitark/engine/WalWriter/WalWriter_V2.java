@@ -318,7 +318,7 @@ public class WalWriter_V2 implements AutoCloseable {
     private static class WriteRequest {
         private  WalRecord record;
         private WalPosition position;
-        private CompletableFuture<Long> futrue = new CompletableFuture<>();
+        private CompletableFuture<WriterResult> futrue = new CompletableFuture<>();
         Long completedLeaderLsn;
         WriteRequest(WalRecord record) {
             this.record = record;

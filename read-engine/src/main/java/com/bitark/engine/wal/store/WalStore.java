@@ -17,4 +17,6 @@ public interface WalStore {
     WalCheckpoint currentCheckPoint() throws  Exception;
 
     void gcOldSegment(WalCheckpoint checkpoint) throws  Exception;
+
+    long earliestRetainedLsn();
 }

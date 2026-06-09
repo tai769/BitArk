@@ -82,7 +82,7 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
         tracker.onHeartbeat(req.getSlaveUrl(), req.getFromLsn());
 
         //3. 判断是否断代
-        long earliest = walEngine.earliestRetainedLsn();
+        long earliest = logEngine.earliestRetainedLsn();
 
         FetchResponse resp = new FetchResponse();
         if (req.getFromLsn() < earliest){
@@ -92,7 +92,7 @@ public class MasterReplicationServiceImpl implements MasterReplicationService{
             return resp;
         }
         //4. Pull 模式下，读取一批 WAL 并转换成批量返回 DTO
-        WalReadBatch batch = walEngine.readBatch(req.getFromLsn(), req.getMaxBytes());
+        WalReadBatch batch = logEngine.readBatch(req.getFromLsn(), req.getMaxBytes());
         List<FetchEntryDTO> entries = new ArrayList<>();
         for (WalRecord record :  batch.getRecords()){
             FetchEntryDTO item = new FetchEntryDTO();
